@@ -193,9 +193,10 @@
       { key: "test_policy" }, { key: "yield" }] },
     { group: "Cost", items: [
       { key: "tuition_in" }, { key: "tuition_out" }, { key: "cost_attend" },
-      { key: "net_price" }, { key: "np_0_30" }, { key: "np_30_48" }, { key: "np_48_75" },
+      { key: "net_price" }, { key: "grant_aid" },
+      { key: "np_0_30" }, { key: "np_30_48" }, { key: "np_48_75" },
       { key: "np_75_110" }, { key: "np_110p" }, { key: "pct_pell" }, { key: "pct_loan" },
-      { key: "debt_median" }] },
+      { key: "debt_median" }, { key: "loan_payment" }] },
     { group: "Outcomes", items: [
       { key: "grad_rate" }, { key: "retention" }, { key: "earn_6" }, { key: "earn_10" }] },
     { group: "Diversity", items: [

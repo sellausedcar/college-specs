@@ -23,6 +23,12 @@ IPEDS_ADM_URL_TEMPLATE = "https://nces.ed.gov/ipeds/datacenter/data/ADM{year}.zi
 IPEDS_ADM_PROBE_START_YEAR = 2026  # probe this year downward
 IPEDS_ADM_MIN_YEAR = 2021
 
+# IPEDS SFA (Student Financial Aid) survey -> average grant aid. Concatenated academic-year
+# naming: SFA{startYY}{endYY}, e.g. SFA2223 = academic year 2022-23. Probe by end-year.
+IPEDS_SFA_URL_TEMPLATE = "https://nces.ed.gov/ipeds/datacenter/data/{name}.zip"
+IPEDS_SFA_PROBE_START_YEAR = 2027  # end-year of the academic year; probe downward
+IPEDS_SFA_MIN_YEAR = 2020
+
 # Clery Act campus safety. Unofficial endpoints reverse-engineered from the SPA.
 # NOTE: the file endpoint rejects HEAD requests (405) - always plain GET.
 CLERY_FILELIST_URL = "https://ope.ed.gov/campussafety/api/dataFiles/fileList"
@@ -53,7 +59,7 @@ SCORECARD_COLS = [
     "TUITIONFEE_IN", "TUITIONFEE_OUT", "NPT4_PUB", "NPT4_PRIV",
     "NPT41_PUB", "NPT42_PUB", "NPT43_PUB", "NPT44_PUB", "NPT45_PUB",
     "NPT41_PRIV", "NPT42_PRIV", "NPT43_PRIV", "NPT44_PRIV", "NPT45_PRIV",
-    "COSTT4_A", "PCTPELL", "PCTFLOAN", "GRAD_DEBT_MDN",
+    "COSTT4_A", "PCTPELL", "PCTFLOAN", "GRAD_DEBT_MDN", "GRAD_DEBT_MDN10YR",
     # outcomes
     "C150_4", "RET_FT4", "MD_EARN_WNE_P6", "MD_EARN_WNE_P10",
     # diversity (race/ethnicity shares of undergraduate enrollment)
@@ -180,6 +186,8 @@ FIELDS = [
     {"key": "tuition_out","label": "Tuition (out-of-state)","group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "cost_attend","label": "Cost of attendance",   "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "net_price", "label": "Avg net price",         "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
+    {"key": "grant_aid", "label": "Avg grant aid",         "group": "cost", "type": "usd", "better": "higher", "source": "ipeds_sfa",
+     "note": "Average grant & scholarship aid awarded to full-time first-time undergraduates"},
     {"key": "np_0_30",   "label": "Net price: $0-30k income",   "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "np_30_48",  "label": "Net price: $30-48k income",  "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "np_48_75",  "label": "Net price: $48-75k income",  "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
@@ -188,6 +196,8 @@ FIELDS = [
     {"key": "pct_pell",  "label": "% receiving Pell grants",    "group": "cost", "type": "frac", "better": "neutral", "source": "scorecard"},
     {"key": "pct_loan",  "label": "% receiving federal loans",  "group": "cost", "type": "frac", "better": "neutral", "source": "scorecard"},
     {"key": "debt_median","label": "Median debt at graduation", "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
+    {"key": "loan_payment","label": "Median monthly loan payment", "group": "cost", "type": "usd", "better": "lower", "source": "scorecard",
+     "note": "Median federal-loan debt repaid over 10 years at a fixed rate"},
     # -- outcomes
     {"key": "grad_rate", "label": "Graduation rate (6-yr)",  "group": "out", "type": "frac", "better": "higher", "source": "scorecard"},
     {"key": "retention", "label": "Freshman retention",      "group": "out", "type": "frac", "better": "higher", "source": "scorecard"},

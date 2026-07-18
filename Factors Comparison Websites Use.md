@@ -326,11 +326,11 @@ Legend: **●** shown · **◐** partial / available but not surfaced · blank =
 | Factor | Scorecard | Navigator | CDS | CollegeSimply | Niche | **Your Tool** |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|
 | % receiving aid / grants | ◐ | ● | ● | ● |  | ● |
-| Average grant aid amount |  | ● | ● | ● |  |  |
+| Average grant aid amount |  | ● | ● | ● |  | ● |
 | Grant aid by source (federal / state / institutional) |  | ● | ● |  |  |  |
 | % receiving loans | ● | ● | ● |  |  | ● |
 | Median debt at graduation | ● |  | ● | ● |  | ● |
-| Median monthly loan payment | ● |  |  | ● |  |  |
+| Median monthly loan payment | ● |  |  | ● |  | ● |
 | Loan repayment rate | ● |  |  | ● |  |  |
 | % of financial need met |  |  | ● |  |  |  |
 

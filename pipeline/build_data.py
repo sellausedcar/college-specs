@@ -108,6 +108,30 @@ def resolve_adm(skip, force):
     die("no IPEDS ADM file found in probe range")
 
 
+def resolve_sfa(skip, force):
+    """Probe IPEDS SFA{startYY}{endYY}.zip newest-first and download the newest that exists."""
+    if skip:
+        p = newest_cached("SFA*.zip")
+        if not p:
+            die("--skip-download but no cached SFA zip")
+        return p
+    for end in range(config.IPEDS_SFA_PROBE_START_YEAR, config.IPEDS_SFA_MIN_YEAR - 1, -1):
+        name = f"SFA{(end - 1) % 100:02d}{end % 100:02d}"
+        url = config.IPEDS_SFA_URL_TEMPLATE.format(name=name)
+        dest = CACHE / f"{name}.zip"
+        if dest.exists() and not force:
+            log(f"  cached: {dest.name}")
+            return dest
+        r = requests.get(url, headers=config.HTTP_HEADERS, stream=True, timeout=60)
+        if r.status_code == 200:
+            log(f"  newest available IPEDS SFA: {name} (academic year {end - 1}-{end % 100:02d})")
+            r.close()
+            return download(url, dest, force)
+        r.close()
+        log(f"  {name}.zip -> {r.status_code}")
+    die("no IPEDS SFA file found in probe range")
+
+
 def resolve_clery(skip, force):
     """Pick the newest Crime*EXCEL.zip from the Clery fileList API. GET only (HEAD=405)."""
     if skip:
@@ -138,6 +162,7 @@ def stage0(args):
     paths = {}
     paths["scorecard"] = resolve_scorecard(args.skip_download, args.force_download)
     paths["adm"] = resolve_adm(args.skip_download, args.force_download)
+    paths["sfa"] = resolve_sfa(args.skip_download, args.force_download)
     if args.skip_download:
         for key, url in [("oi1", config.OI_TABLE1_URL), ("oi11", config.OI_TABLE11_URL)]:
             p = CACHE / url.rsplit("/", 1)[1]
@@ -211,6 +236,7 @@ def stage1_scorecard(zip_path):
     df["pct_pell"] = to_num(raw["PCTPELL"])
     df["pct_loan"] = to_num(raw["PCTFLOAN"])
     df["debt_median"] = to_num(raw["GRAD_DEBT_MDN"]).astype("Int64")
+    df["loan_payment"] = to_num(raw["GRAD_DEBT_MDN10YR"]).round().astype("Int64")
     df["grad_rate"] = to_num(raw["C150_4"])
     df["retention"] = to_num(raw["RET_FT4"])
     df["earn_6"] = to_num(raw["MD_EARN_WNE_P6"]).astype("Int64")
@@ -270,6 +296,36 @@ def stage2_yield(df, adm_zip):
     df["yield"] = to_num(df["yield"])
     log(f"  yield coverage: {df['yield'].notna().sum():,}/{len(df):,}")
     return df.drop(columns=["_admssn", "_enrlt"])
+
+
+# ---------------------------------------------------------------------------
+# Stage 2b: IPEDS SFA average grant aid
+# ---------------------------------------------------------------------------
+
+def stage2b_grant_aid(df, sfa_zip):
+    log("=== Stage 2b: IPEDS SFA average grant aid ===")
+    with zipfile.ZipFile(sfa_zip) as z:
+        csvs = [n for n in z.namelist() if n.lower().endswith(".csv")]
+        rv = [n for n in csvs if "_rv" in n.lower()]
+        pick = rv[0] if rv else csvs[0]
+        log(f"  using {pick} (of {csvs})")
+        with z.open(pick) as f:
+            sfa = pd.read_csv(f, dtype=str, na_values=[".", "", " "], encoding="latin-1")
+    sfa.columns = [c.strip().upper() for c in sfa.columns]
+    for col in ("UNITID", "GRNTA2", "GISTA2"):
+        if col not in sfa.columns:
+            die(f"SFA file missing column {col}; has: {list(sfa.columns)[:20]}")
+    # GRNTA2 (academic-year reporters) and GISTA2 (program/other reporters) are mutually
+    # exclusive per school - coalesce to cover both.
+    grant = to_num(sfa["GRNTA2"]).fillna(to_num(sfa["GISTA2"]))
+    small = pd.DataFrame({
+        "unitid": to_num(sfa["UNITID"]).astype("Int64"),
+        "grant_aid": grant,
+    }).dropna(subset=["unitid"]).drop_duplicates("unitid")
+    df = df.merge(small, on="unitid", how="left")
+    df["grant_aid"] = df["grant_aid"].round().astype("Int64")
+    log(f"  grant aid coverage: {df['grant_aid'].notna().sum():,}/{len(df):,}")
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -503,9 +559,12 @@ def main():
     if m:
         scorecard_date = f"{m.group(3)}-{m.group(1)}-{m.group(2)}"
     adm_year = re.search(r"ADM(\d{4})", paths["adm"].name).group(1)
+    sfa_m = re.search(r"SFA(\d{2})(\d{2})", paths["sfa"].name)
+    sfa_span = f"20{sfa_m.group(1)}-{sfa_m.group(2)}" if sfa_m else paths["sfa"].name
 
     df = stage1_scorecard(paths["scorecard"])
     df = stage2_yield(df, paths["adm"])
+    df = stage2b_grant_aid(df, paths["sfa"])
     df = stage3_oi(df, paths["oi1"], paths["oi11"])
     df, clery_years = stage4_clery(df, paths["clery"])
 
@@ -514,6 +573,7 @@ def main():
     vintages = {
         "scorecard": f"College Scorecard, {scorecard_date} release",
         "ipeds_adm": f"IPEDS ADM {adm_year}",
+        "ipeds_sfa": f"IPEDS SFA (grant aid) {sfa_span}",
         "oi": f"Opportunity Insights, {config.OI_VINTAGE}",
         "clery": f"Campus Safety and Security, {clery_span}",
     }
