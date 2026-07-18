@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>College Specs — compare U.S. colleges side-by-side</title>
+<meta name="description" content="Compare U.S. undergraduate colleges like car specs: admissions, cost, outcomes, economic mobility, and campus safety, side-by-side.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-mark">🎓</span>
+      <div>
+        <h1>College Specs</h1>
+        <p class="tagline">Compare U.S. colleges like car specs</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button id="tab-compare" class="tab" role="tab" aria-selected="true">Compare</button>
+      <button id="tab-browse" class="tab" role="tab" aria-selected="false">Browse all</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ Compare view ============ -->
+  <section id="view-compare" class="view" aria-labelledby="tab-compare">
+    <div class="picker-row">
+      <div class="picker" id="picker">
+        <input id="picker-input" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search schools — try &quot;Michigan&quot;, &quot;UCLA&quot;, &quot;MIT&quot;…"
+               aria-label="Search for a school to add to the comparison"
+               aria-expanded="false" aria-controls="picker-list" role="combobox">
+        <ul id="picker-list" class="picker-list" role="listbox" hidden></ul>
+      </div>
+      <div id="chips" class="chips" aria-label="Selected schools"></div>
+    </div>
+
+    <div id="compare-empty" class="empty-state" hidden>
+      <p class="empty-title">Pick 2–5 schools to compare their specs side-by-side.</p>
+      <p class="empty-sub">Admissions · Cost · Outcomes · Size &amp; setting · Economic mobility · Campus safety</p>
+      <button id="btn-example" class="btn btn-primary">Try an example comparison</button>
+    </div>
+
+    <div id="compare-table-wrap" class="table-scroll" hidden>
+      <table id="compare-table" class="spec-table"></table>
+    </div>
+    <div id="compare-notes" class="notes" hidden></div>
+  </section>
+
+  <!-- ============ Browse view ============ -->
+  <section id="view-browse" class="view" hidden aria-labelledby="tab-browse">
+    <div class="filter-bar" id="filter-bar">
+      <input id="f-search" type="search" placeholder="Filter by name or city…" aria-label="Filter by name or city">
+      <select id="f-state" aria-label="State"></select>
+      <select id="f-control" aria-label="Type">
+        <option value="">Any type</option>
+        <option>Public</option>
+        <option>Private nonprofit</option>
+        <option>For-profit</option>
+      </select>
+      <select id="f-size" aria-label="Size">
+        <option value="">Any size</option>
+        <option value="0-2000">&lt; 2,000 students</option>
+        <option value="2000-10000">2,000 – 10,000</option>
+        <option value="10000-20000">10,000 – 20,000</option>
+        <option value="20000-999999">&gt; 20,000</option>
+      </select>
+      <select id="f-adm" aria-label="Acceptance rate">
+        <option value="">Any acceptance rate</option>
+        <option value="0-0.10">&lt; 10% (reach for everyone)</option>
+        <option value="0.10-0.25">10 – 25%</option>
+        <option value="0.25-0.50">25 – 50%</option>
+        <option value="0.50-1.01">&gt; 50%</option>
+      </select>
+      <select id="f-np" aria-label="Net price">
+        <option value="">Any net price</option>
+        <option value="0-15000">&lt; $15k / yr</option>
+        <option value="15000-25000">$15k – 25k</option>
+        <option value="25000-40000">$25k – 40k</option>
+        <option value="40000-999999">&gt; $40k</option>
+      </select>
+      <button id="f-reset" class="btn btn-ghost">Reset</button>
+    </div>
+
+    <div class="browse-toolbar">
+      <span id="browse-count" class="muted"></span>
+      <button id="btn-go-compare" class="btn btn-primary" disabled>Compare selected →</button>
+    </div>
+
+    <div class="table-scroll browse-scroll">
+      <table id="browse-table" class="browse-table"></table>
+    </div>
+    <div class="show-more-row">
+      <button id="btn-show-more" class="btn btn-ghost" hidden>Show more</button>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div id="footer-vintages"></div>
+  <p>
+    Sources: <a href="https://collegescorecard.ed.gov/data" target="_blank" rel="noopener">College Scorecard</a> ·
+    <a href="https://nces.ed.gov/ipeds/use-the-data" target="_blank" rel="noopener">IPEDS</a> ·
+    <a href="https://opportunityinsights.org/data/" target="_blank" rel="noopener">Opportunity Insights</a> ·
+    <a href="https://ope.ed.gov/campussafety/" target="_blank" rel="noopener">Campus Safety &amp; Security (Clery Act)</a>
+  </p>
+  <p class="muted">
+    Clery figures are reported on-campus incidents — reporting practices vary and rates are not a complete
+    measure of safety. Opportunity Insights mobility estimates are from the 2017-18 release (1980-91 birth
+    cohorts). SAT/ACT ranges are sparse where schools are test-optional. "N/A" usually means the statistic
+    was suppressed for privacy or not reported. Not affiliated with any school or agency.
+  </p>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
