@@ -1,8 +1,8 @@
-👋 @sellausedcar — monthly nudge for **College Specs**.
+👋 @sellausedcar — monthly reminder for **College Specs**.
 
-A reminder to consider whether the source data needs a refresh, plus the automation options on the table.
+**Rewrite Scorecard to use the API** — api.data.gov is a different host that isn't IP-blocked. This would make cloud automation work, but it's a real rewrite (~50 field mappings + pagination) and needs a free API key stored as a GitHub secret (the key stays server-side, never in the published site). Heavier, but truly hands-off.
 
-### Refresh manually (recommended)
+**Keep it manual.** The underlying data only changes ~once a year, so the effort of either automation path isn't worth it. When new Scorecard/IPEDS data drops, just:
 
 ```
 python pipeline/build_data.py
@@ -10,13 +10,6 @@ git commit -am "refresh data"
 git push
 ```
 
-The live site redeploys itself within a minute.
-
-### Automation options still open
-
-- **Local weekly scheduled task** — already set up (Windows Task Scheduler → `weekly-refresh.cmd`); runs weekly when the PC is on.
-- **Deferred: cloud automation via `api.data.gov`** — full hands-off cloud refresh isn't possible today because the Scorecard bulk-download CDN IP-blocks GitHub's runners (403). The fix is to rewrite the Scorecard fetch to use `api.data.gov` (a different host that isn't blocked) — a real rewrite (~50 field mappings + pagination) plus a free API key stored as a GitHub secret (server-side only, never in the published site). Heavier, but truly hands-off.
-
-Full details: [README → Automation options](https://github.com/sellausedcar/college-specs/blob/master/README.md#automation-options-keeping-the-door-open).
+…and the site updates itself within a minute.
 
 *(Automated monthly reminder — close this issue once you've refreshed, or just ignore it.)*
