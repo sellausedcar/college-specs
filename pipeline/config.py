@@ -56,6 +56,16 @@ SCORECARD_COLS = [
     "COSTT4_A", "PCTPELL", "PCTFLOAN", "GRAD_DEBT_MDN",
     # outcomes
     "C150_4", "RET_FT4", "MD_EARN_WNE_P6", "MD_EARN_WNE_P10",
+    # diversity (race/ethnicity shares of undergraduate enrollment)
+    "UGDS_WHITE", "UGDS_BLACK", "UGDS_HISP", "UGDS_ASIAN", "UGDS_AIAN",
+    "UGDS_NHPI", "UGDS_2MOR", "UGDS_NRA", "UGDS_UNKN",
+    # academics (share of degrees awarded by 2-digit CIP field)
+    "PCIP01", "PCIP03", "PCIP04", "PCIP05", "PCIP09", "PCIP10", "PCIP11",
+    "PCIP12", "PCIP13", "PCIP14", "PCIP15", "PCIP16", "PCIP19", "PCIP22",
+    "PCIP23", "PCIP24", "PCIP25", "PCIP26", "PCIP27", "PCIP29", "PCIP30",
+    "PCIP31", "PCIP38", "PCIP39", "PCIP40", "PCIP41", "PCIP42", "PCIP43",
+    "PCIP44", "PCIP45", "PCIP46", "PCIP47", "PCIP48", "PCIP49", "PCIP50",
+    "PCIP51", "PCIP52", "PCIP54",
 ]
 
 SCORECARD_NA_VALUES = ["NULL", "PrivacySuppressed", ""]
@@ -75,6 +85,42 @@ LOCALE_LABELS = {
     21: "Suburb: Large", 22: "Suburb: Midsize", 23: "Suburb: Small",
     31: "Town: Fringe", 32: "Town: Distant", 33: "Town: Remote",
     41: "Rural: Fringe", 42: "Rural: Distant", 43: "Rural: Remote",
+}
+
+# Race/ethnicity shares of undergraduate enrollment: (output key, Scorecard col, label)
+RACE_FIELDS = [
+    ("race_white", "UGDS_WHITE", "White"),
+    ("race_black", "UGDS_BLACK", "Black"),
+    ("race_hisp",  "UGDS_HISP",  "Hispanic / Latino"),
+    ("race_asian", "UGDS_ASIAN", "Asian"),
+    ("race_aian",  "UGDS_AIAN",  "American Indian / Alaska Native"),
+    ("race_nhpi",  "UGDS_NHPI",  "Native Hawaiian / Pacific Islander"),
+    ("race_2mor",  "UGDS_2MOR",  "Two or more races"),
+    ("race_intl",  "UGDS_NRA",   "International (non-resident)"),
+    ("race_unkn",  "UGDS_UNKN",  "Race unknown"),
+]
+
+# 2-digit CIP field -> human-readable label, for "popular majors" (top 5 by degree share)
+CIP_LABELS = {
+    "PCIP01": "Agriculture", "PCIP03": "Natural Resources & Conservation",
+    "PCIP04": "Architecture", "PCIP05": "Area, Ethnic & Gender Studies",
+    "PCIP09": "Communication & Journalism", "PCIP10": "Communications Technologies",
+    "PCIP11": "Computer & Information Sciences", "PCIP12": "Personal & Culinary Services",
+    "PCIP13": "Education", "PCIP14": "Engineering", "PCIP15": "Engineering Technologies",
+    "PCIP16": "Foreign Languages & Linguistics", "PCIP19": "Family & Consumer Sciences",
+    "PCIP22": "Legal Professions", "PCIP23": "English Language & Literature",
+    "PCIP24": "Liberal Arts & Humanities", "PCIP25": "Library Science",
+    "PCIP26": "Biological & Biomedical Sciences", "PCIP27": "Mathematics & Statistics",
+    "PCIP29": "Military Technologies", "PCIP30": "Multi / Interdisciplinary Studies",
+    "PCIP31": "Parks, Recreation & Fitness", "PCIP38": "Philosophy & Religious Studies",
+    "PCIP39": "Theology & Religious Vocations", "PCIP40": "Physical Sciences",
+    "PCIP41": "Science Technologies", "PCIP42": "Psychology",
+    "PCIP43": "Homeland Security & Law Enforcement",
+    "PCIP44": "Public Administration & Social Services", "PCIP45": "Social Sciences",
+    "PCIP46": "Construction Trades", "PCIP47": "Mechanic & Repair Technologies",
+    "PCIP48": "Precision Production", "PCIP49": "Transportation & Materials Moving",
+    "PCIP50": "Visual & Performing Arts", "PCIP51": "Health Professions",
+    "PCIP52": "Business, Management & Marketing", "PCIP54": "History",
 }
 
 # IPEDS admission consideration codes (test scores). Verified against data at build:
@@ -160,6 +206,15 @@ FIELDS = [
     {"key": "safety_violent_per1k",  "label": "Violent incidents /1k students/yr",  "group": "safe", "type": "num", "better": "lower", "source": "clery"},
     {"key": "safety_property_per1k", "label": "Property incidents /1k students/yr", "group": "safe", "type": "num", "better": "lower", "source": "clery"},
 ]
+
+# Academics: popular majors (top-5 list of [label, share] pairs; rendered specially in the UI)
+FIELDS.append({"key": "majors", "label": "Popular majors", "group": "acad",
+               "type": "majors", "better": "neutral", "source": "scorecard"})
+
+# Diversity: race/ethnicity shares (generated from RACE_FIELDS to stay in sync)
+FIELDS += [{"key": k, "label": lbl, "group": "div", "type": "frac",
+            "better": "neutral", "source": "scorecard"}
+           for k, _col, lbl in RACE_FIELDS]
 
 FIELD_KEYS = [f["key"] for f in FIELDS]
 

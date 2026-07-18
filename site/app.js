@@ -49,6 +49,12 @@
   function titleCase(s) {
     return String(s).toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
   }
+  function renderMajors(list) {
+    return list.map(function (m) {
+      return "<div class=\"major-row\"><span class=\"major-name\">" + esc(m[0]) +
+        "</span><span class=\"major-pct\">" + Math.round(m[1] * 100) + "%</span></div>";
+    }).join("");
+  }
 
   // ------------------------------------------------------- search index
   var INDEX = SCHOOLS.map(function (r) {
@@ -175,7 +181,9 @@
   // ------------------------------------------------------------ compare view
   var ROWS = [
     { group: "Size & setting", items: [
-      { key: "control" }, { key: "locale" }, { key: "enrollment" }, { key: "stufac" }] },
+      { key: "control" }, { key: "locale" }, { key: "enrollment" }] },
+    { group: "Academics", items: [
+      { key: "stufac" }, { key: "majors" }] },
     { group: "Admissions", items: [
       { key: "adm_rate" },
       { range: ["sat_v25", "sat_v75"], label: "SAT EBRW (25th–75th)" },
@@ -190,6 +198,10 @@
       { key: "debt_median" }] },
     { group: "Outcomes", items: [
       { key: "grad_rate" }, { key: "retention" }, { key: "earn_6" }, { key: "earn_10" }] },
+    { group: "Diversity", items: [
+      { key: "race_white" }, { key: "race_black" }, { key: "race_hisp" }, { key: "race_asian" },
+      { key: "race_aian" }, { key: "race_nhpi" }, { key: "race_2mor" }, { key: "race_intl" },
+      { key: "race_unkn" }] },
     { group: "Economic mobility", items: [
       { key: "oi_access" }, { key: "oi_success" }, { key: "oi_mobility" }] },
     { group: "Campus safety", items: [
@@ -272,6 +284,12 @@
         html += "<tr><td class=\"rowlabel\"" + (meta.note ? " title=\"" + esc(meta.note) + "\"" : "") + ">" +
                 esc(meta.label) + "</td>";
         rows.forEach(function (r, i) {
+          if (meta.type === "majors") {
+            var mlist = get(r, "majors");
+            html += "<td>" + (mlist && mlist.length
+              ? renderMajors(mlist) : "<span class=\"cell-val cell-na\">N/A</span>") + "</td>";
+            return;
+          }
           var v = vals[i];
           var disp = itemDisplay(item, r);
           var isBest = winner !== null && v !== null && Math.abs(v - winner) < 1e-9;

@@ -216,6 +216,22 @@ def stage1_scorecard(zip_path):
     df["earn_6"] = to_num(raw["MD_EARN_WNE_P6"]).astype("Int64")
     df["earn_10"] = to_num(raw["MD_EARN_WNE_P10"]).astype("Int64")
 
+    # diversity: race/ethnicity shares (fractions 0-1)
+    for out_key, col, _lbl in config.RACE_FIELDS:
+        df[out_key] = to_num(raw[col]).round(4)
+
+    # academics: top-5 majors by share of degrees awarded
+    pcip_cols = list(config.CIP_LABELS.keys())
+    pcip = raw[pcip_cols].apply(to_num)
+
+    def top_majors(row):
+        pairs = [(config.CIP_LABELS[c], row[c]) for c in pcip_cols
+                 if pd.notna(row[c]) and row[c] > 0]
+        pairs.sort(key=lambda x: x[1], reverse=True)
+        return [[lbl, round(float(v), 4)] for lbl, v in pairs[:5]] or None
+
+    df["majors"] = [top_majors(r) for _, r in pcip.iterrows()]
+
     # join keys kept internally (not emitted)
     df["_opeid6"] = raw["OPEID6"].str.strip()
     df["_opeid8"] = raw["OPEID"].str.strip()
@@ -394,6 +410,8 @@ def stage4_clery(df, clery_zip):
 # ---------------------------------------------------------------------------
 
 def cast_value(v, ftype):
+    if ftype == "majors":
+        return v if isinstance(v, list) and v else None
     if v is None or (isinstance(v, float) and pd.isna(v)) or pd.isna(v):
         return None
     if ftype == "int" or ftype == "usd":

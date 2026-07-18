@@ -179,6 +179,13 @@ td.best { background: var(--best-bg); }
 td.best .cell-val { font-weight: 700; }
 td.best .cell-val::before { content: "✓ "; color: var(--best-ink); font-weight: 700; }
 
+.major-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 1px 0; font-size: 13.5px; white-space: nowrap;
+}
+.major-name { color: var(--ink); }
+.major-pct { color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .notes { margin-top: 12px; color: var(--muted); font-size: 13px; }
 .notes p { margin: 4px 0; }
 
