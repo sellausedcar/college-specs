@@ -305,8 +305,9 @@ Legend: **●** shown · **◐** partial / available but not surfaced · blank =
 | Average HS GPA / grades |  |  | ● | ● |  |  |
 | HS class rank |  |  | ● |  |  |  |
 | Admission-factor weightings (essays, rigor…) |  |  | ● |  |  |  |
-| Application fee |  | ● | ● |  |  |  |
+| Application fee |  | ● | ● |  |  | ● |
 | Application deadline |  |  | ● | ● | ◐ |  |
+| Application essay policy |  |  | ● |  |  | ● |
 | Admission-chance predictor |  |  |  |  | ● |  |
 | Admissions-difficulty rating label |  |  |  | ● |  |  |
 

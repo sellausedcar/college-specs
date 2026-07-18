@@ -185,12 +185,12 @@
     { group: "Academics", items: [
       { key: "stufac" }, { key: "majors" }] },
     { group: "Admissions", items: [
-      { key: "adm_rate" },
+      { key: "adm_rate" }, { key: "app_fee" },
       { range: ["sat_v25", "sat_v75"], label: "SAT EBRW (25th–75th)" },
       { range: ["sat_m25", "sat_m75"], label: "SAT Math (25th–75th)" },
       { key: "sat_avg" },
       { range: ["act_25", "act_75"], label: "ACT composite (25th–75th)" },
-      { key: "test_policy" }, { key: "yield" }] },
+      { key: "test_policy" }, { key: "essay" }, { key: "yield" }] },
     { group: "Cost", items: [
       { key: "tuition_in" }, { key: "tuition_out" }, { key: "cost_attend" },
       { key: "net_price" }, { key: "grant_aid" },

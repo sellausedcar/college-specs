@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import csv
 import datetime
 import io
 import json
@@ -132,6 +133,44 @@ def resolve_sfa(skip, force):
     die("no IPEDS SFA file found in probe range")
 
 
+def ic_has_fee(zip_path):
+    """True if the IC zip's CSV contains the APPLFEEU column (full, not provisional, release)."""
+    try:
+        with zipfile.ZipFile(zip_path) as z:
+            cn = [n for n in z.namelist() if n.lower().endswith(".csv")][0]
+            with z.open(cn) as f:
+                hdr = next(csv.reader(io.TextIOWrapper(f, "utf-8-sig")))
+        return "APPLFEEU" in {h.strip().upper() for h in hdr}
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def resolve_ic(skip, force):
+    """Newest IPEDS IC file that actually contains APPLFEEU (provisional releases omit it)."""
+    if skip:
+        for p in sorted(CACHE.glob("IC20*.zip"), key=lambda x: x.stat().st_mtime, reverse=True):
+            if "_dict" not in p.name.lower() and ic_has_fee(p):
+                log(f"  cached: {p.name}")
+                return p
+        die("--skip-download but no cached IC zip with APPLFEEU")
+    for year in range(config.IPEDS_IC_PROBE_START_YEAR, config.IPEDS_IC_MIN_YEAR - 1, -1):
+        url = config.IPEDS_IC_URL_TEMPLATE.format(year=year)
+        dest = CACHE / f"IC{year}.zip"
+        if not dest.exists() or force:
+            r = requests.get(url, headers=config.HTTP_HEADERS, stream=True, timeout=60)
+            code = r.status_code
+            r.close()
+            if code != 200:
+                log(f"  IC{year}.zip -> {code}")
+                continue
+            download(url, dest, force)
+        if ic_has_fee(dest):
+            log(f"  using IC{year} (has APPLFEEU)")
+            return dest
+        log(f"  IC{year} lacks APPLFEEU (provisional); trying older")
+    die("no IC file with APPLFEEU found in probe range")
+
+
 def resolve_clery(skip, force):
     """Pick the newest Crime*EXCEL.zip from the Clery fileList API. GET only (HEAD=405)."""
     if skip:
@@ -163,6 +202,7 @@ def stage0(args):
     paths["scorecard"] = resolve_scorecard(args.skip_download, args.force_download)
     paths["adm"] = resolve_adm(args.skip_download, args.force_download)
     paths["sfa"] = resolve_sfa(args.skip_download, args.force_download)
+    paths["ic"] = resolve_ic(args.skip_download, args.force_download)
     if args.skip_download:
         for key, url in [("oi1", config.OI_TABLE1_URL), ("oi11", config.OI_TABLE11_URL)]:
             p = CACHE / url.rsplit("/", 1)[1]
@@ -223,8 +263,9 @@ def stage1_scorecard(zip_path):
     admcon = to_num(raw["ADMCON7"])
     log("  ADMCON7 code distribution: "
         + str(admcon.value_counts(dropna=False).to_dict()))
-    df["test_policy"] = admcon.map(config.ADMCON7_LABELS)
-    df["yield"] = pd.NA  # stage 2
+    df["test_policy"] = admcon.map(config.ADMCON_LABELS)
+    df["essay"] = pd.NA   # stage 2 (from IPEDS ADM ADMCON11)
+    df["yield"] = pd.NA   # stage 2
     df["tuition_in"] = to_num(raw["TUITIONFEE_IN"]).astype("Int64")
     df["tuition_out"] = to_num(raw["TUITIONFEE_OUT"]).astype("Int64")
     df["cost_attend"] = to_num(raw["COSTT4_A"]).astype("Int64")
@@ -285,17 +326,23 @@ def stage2_yield(df, adm_zip):
     for col in ("UNITID", "ADMSSN", "ENRLT"):
         if col not in adm.columns:
             die(f"ADM file missing column {col}; has: {list(adm.columns)[:20]}")
+    # ADMCON11 (personal statement / essay) may be absent in older ADM files.
+    admcon11 = (to_num(adm["ADMCON11"]) if "ADMCON11" in adm.columns
+                else pd.Series(pd.NA, index=adm.index))
     adm_small = pd.DataFrame({
         "unitid": to_num(adm["UNITID"]).astype("Int64"),
         "_admssn": to_num(adm["ADMSSN"]),
         "_enrlt": to_num(adm["ENRLT"]),
+        "_admcon11": admcon11,
     }).dropna(subset=["unitid"]).drop_duplicates("unitid")
     df = df.merge(adm_small, on="unitid", how="left")
     ok = (df["_admssn"] > 0) & df["_enrlt"].notna()
     df.loc[ok, "yield"] = (df.loc[ok, "_enrlt"] / df.loc[ok, "_admssn"]).clip(upper=1.0)
     df["yield"] = to_num(df["yield"])
-    log(f"  yield coverage: {df['yield'].notna().sum():,}/{len(df):,}")
-    return df.drop(columns=["_admssn", "_enrlt"])
+    df["essay"] = df["_admcon11"].map(config.ADMCON_LABELS)
+    log(f"  yield coverage: {df['yield'].notna().sum():,}/{len(df):,}; "
+        f"essay coverage: {df['essay'].notna().sum():,}/{len(df):,}")
+    return df.drop(columns=["_admssn", "_enrlt", "_admcon11"])
 
 
 # ---------------------------------------------------------------------------
@@ -325,6 +372,31 @@ def stage2b_grant_aid(df, sfa_zip):
     df = df.merge(small, on="unitid", how="left")
     df["grant_aid"] = df["grant_aid"].round().astype("Int64")
     log(f"  grant aid coverage: {df['grant_aid'].notna().sum():,}/{len(df):,}")
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Stage 2c: IPEDS IC undergraduate application fee
+# ---------------------------------------------------------------------------
+
+def stage2c_app_fee(df, ic_zip):
+    log("=== Stage 2c: IPEDS IC application fee ===")
+    with zipfile.ZipFile(ic_zip) as z:
+        cn = [n for n in z.namelist() if n.lower().endswith(".csv")][0]
+        log(f"  using {cn}")
+        with z.open(cn) as f:
+            ic = pd.read_csv(
+                f, dtype=str, encoding="utf-8-sig", na_values=[".", "", " "],
+                usecols=lambda c: c.strip().upper() in ("UNITID", "APPLFEEU"),
+            )
+    ic.columns = [c.strip().upper() for c in ic.columns]
+    small = pd.DataFrame({
+        "unitid": to_num(ic["UNITID"]).astype("Int64"),
+        "app_fee": to_num(ic["APPLFEEU"]),
+    }).dropna(subset=["unitid"]).drop_duplicates("unitid")
+    df = df.merge(small, on="unitid", how="left")
+    df["app_fee"] = df["app_fee"].round().astype("Int64")
+    log(f"  application fee coverage: {df['app_fee'].notna().sum():,}/{len(df):,}")
     return df
 
 
@@ -561,10 +633,13 @@ def main():
     adm_year = re.search(r"ADM(\d{4})", paths["adm"].name).group(1)
     sfa_m = re.search(r"SFA(\d{2})(\d{2})", paths["sfa"].name)
     sfa_span = f"20{sfa_m.group(1)}-{sfa_m.group(2)}" if sfa_m else paths["sfa"].name
+    ic_m = re.search(r"IC(\d{4})", paths["ic"].name)
+    ic_year = ic_m.group(1) if ic_m else paths["ic"].name
 
     df = stage1_scorecard(paths["scorecard"])
     df = stage2_yield(df, paths["adm"])
     df = stage2b_grant_aid(df, paths["sfa"])
+    df = stage2c_app_fee(df, paths["ic"])
     df = stage3_oi(df, paths["oi1"], paths["oi11"])
     df, clery_years = stage4_clery(df, paths["clery"])
 
@@ -574,6 +649,7 @@ def main():
         "scorecard": f"College Scorecard, {scorecard_date} release",
         "ipeds_adm": f"IPEDS ADM {adm_year}",
         "ipeds_sfa": f"IPEDS SFA (grant aid) {sfa_span}",
+        "ipeds_ic": f"IPEDS IC (application fee) {ic_year}",
         "oi": f"Opportunity Insights, {config.OI_VINTAGE}",
         "clery": f"Campus Safety and Security, {clery_span}",
     }

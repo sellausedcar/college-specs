@@ -29,6 +29,13 @@ IPEDS_SFA_URL_TEMPLATE = "https://nces.ed.gov/ipeds/datacenter/data/{name}.zip"
 IPEDS_SFA_PROBE_START_YEAR = 2027  # end-year of the academic year; probe downward
 IPEDS_SFA_MIN_YEAR = 2020
 
+# IPEDS IC (Institutional Characteristics) survey -> undergraduate application fee.
+# The newest year's provisional/directory release lacks APPLFEEU, so the pipeline probes
+# newest-first and takes the newest IC file that actually contains the fee column.
+IPEDS_IC_URL_TEMPLATE = "https://nces.ed.gov/ipeds/datacenter/data/IC{year}.zip"
+IPEDS_IC_PROBE_START_YEAR = 2027
+IPEDS_IC_MIN_YEAR = 2020
+
 # Clery Act campus safety. Unofficial endpoints reverse-engineered from the SPA.
 # NOTE: the file endpoint rejects HEAD requests (405) - always plain GET.
 CLERY_FILELIST_URL = "https://ope.ed.gov/campussafety/api/dataFiles/fileList"
@@ -129,13 +136,14 @@ CIP_LABELS = {
     "PCIP52": "Business, Management & Marketing", "PCIP54": "History",
 }
 
-# IPEDS admission consideration codes (test scores). Verified against data at build:
-# distribution is printed by the pipeline; unknown codes fall back to None.
-ADMCON7_LABELS = {
+# IPEDS admission-consideration codes, shared by ADMCON7 (test scores) and ADMCON11
+# (personal statement / essay). Verified against the ADM dictionary Frequencies sheet;
+# unknown codes fall back to None.
+ADMCON_LABELS = {
     1: "Required",
     2: "Recommended",
-    3: "Not required",
-    4: "Unknown",
+    3: "Not considered",
+    4: "Required for some",
     5: "Considered if submitted",
 }
 
@@ -172,6 +180,7 @@ FIELDS = [
     {"key": "stufac",    "label": "Student-faculty ratio","group": "size","type": "ratio","better": "lower",  "source": "scorecard"},
     # -- admissions
     {"key": "adm_rate",  "label": "Acceptance rate",    "group": "adm",  "type": "frac", "better": "neutral", "source": "scorecard"},
+    {"key": "app_fee",   "label": "Application fee",     "group": "adm",  "type": "usd",  "better": "lower",   "source": "ipeds_ic"},
     {"key": "sat_v25",   "label": "SAT EBRW 25th pct",  "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
     {"key": "sat_v75",   "label": "SAT EBRW 75th pct",  "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
     {"key": "sat_m25",   "label": "SAT Math 25th pct",  "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
@@ -180,6 +189,7 @@ FIELDS = [
     {"key": "act_25",    "label": "ACT 25th pct",       "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
     {"key": "act_75",    "label": "ACT 75th pct",       "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
     {"key": "test_policy","label": "Test scores",       "group": "adm",  "type": "str",  "better": "neutral", "source": "scorecard"},
+    {"key": "essay",     "label": "Application essay",   "group": "adm",  "type": "str",  "better": "neutral", "source": "ipeds_adm"},
     {"key": "yield",     "label": "Yield (enrolled / admitted)", "group": "adm", "type": "frac", "better": "higher", "source": "ipeds_adm"},
     # -- cost
     {"key": "tuition_in", "label": "Tuition (in-state)",   "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
