@@ -56,13 +56,26 @@ statistics for privacy.
 
 ## Deploying
 
-The `site/` folder is the entire site. Either:
+The `site/` folder is the entire site (no build step).
 
-- **GitHub Pages**: push this repo, then Settings → Pages → deploy from branch,
-  folder `/site` (or use an action). 
-- **Netlify**: drag-and-drop the `site/` folder, or set publish directory to `site`.
+**Live site:** https://sellausedcar.github.io/college-specs/
 
-No build command needed.
+**GitHub Pages (this repo's setup):** a GitHub Actions workflow
+(`.github/workflows/deploy.yml`) publishes the `site/` folder on every push to `master`.
+Pages branch-deployment can only serve from `/` or `/docs`, so the workflow uploads
+`site/` as a Pages artifact instead — no restructuring, no Jekyll. To refresh the live
+site after regenerating data, just commit and push:
+
+```
+python pipeline/build_data.py
+git commit -am "refresh data"
+git push
+```
+
+The workflow redeploys automatically.
+
+**Other hosts:** the `site/` folder is a plain static site — e.g. drag-and-drop it onto
+Netlify, or set the publish directory to `site`.
 
 ## Project layout
 
