@@ -186,6 +186,24 @@ td.best .cell-val::before { content: "✓ "; color: var(--best-ink); font-weight
 .major-name { color: var(--ink); }
 .major-pct { color: var(--muted); font-variant-numeric: tabular-nums; }
 
+.prompt-link {
+  display: inline-block; margin-top: 4px; font-size: 12.5px; white-space: nowrap;
+}
+
+.essay-note {
+  margin-top: 14px; border: 1px solid var(--grid); border-radius: 12px;
+  background: var(--surface); padding: 0 16px;
+}
+.essay-note > summary {
+  cursor: pointer; padding: 12px 0; font-weight: 650; font-size: 14px; list-style-position: inside;
+}
+.essay-note > summary:hover { color: var(--accent); }
+.essay-note[open] > summary { border-bottom: 1px solid var(--grid); margin-bottom: 4px; }
+.essay-note p { color: var(--ink-2); font-size: 13.5px; margin: 10px 0; }
+.essay-note .ca-prompts { margin: 10px 0; padding-left: 22px; color: var(--ink); }
+.essay-note .ca-prompts li { font-size: 13.5px; margin: 7px 0; line-height: 1.5; }
+.essay-note p.muted { color: var(--muted); font-size: 12.5px; }
+
 .notes { margin-top: 12px; color: var(--muted); font-size: 13px; }
 .notes p { margin: 4px 0; }
 

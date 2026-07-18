@@ -46,6 +46,10 @@
     if (!u) return null;
     return /^https?:\/\//i.test(u) ? u : "https://" + u;
   }
+  function essaySearchUrl(name) {
+    return "https://www.google.com/search?q=" +
+      encodeURIComponent("\"" + name + "\" supplemental essay prompts");
+  }
   function titleCase(s) {
     return String(s).toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
   }
@@ -171,6 +175,7 @@
     pickerInput: $("picker-input"), pickerList: $("picker-list"),
     chips: $("chips"), empty: $("compare-empty"), example: $("btn-example"),
     tableWrap: $("compare-table-wrap"), table: $("compare-table"), notes: $("compare-notes"),
+    essayNote: $("essay-note"),
     fSearch: $("f-search"), fState: $("f-state"), fControl: $("f-control"),
     fSize: $("f-size"), fAdm: $("f-adm"), fNp: $("f-np"), fReset: $("f-reset"),
     browseCount: $("browse-count"), goCompare: $("btn-go-compare"),
@@ -240,6 +245,7 @@
 
     el.empty.hidden = rows.length !== 0;
     el.tableWrap.hidden = rows.length === 0;
+    el.essayNote.hidden = rows.length === 0;
     el.notes.hidden = true;
     if (!rows.length) { el.table.innerHTML = ""; renderChips(); return; }
 
@@ -289,6 +295,14 @@
             var mlist = get(r, "majors");
             html += "<td>" + (mlist && mlist.length
               ? renderMajors(mlist) : "<span class=\"cell-val cell-na\">N/A</span>") + "</td>";
+            return;
+          }
+          if (item.key === "essay") {
+            var pol = get(r, "essay");
+            html += "<td><span class=\"cell-val" + (pol === null ? " cell-na" : "") + "\">" +
+              (pol === null ? "N/A" : esc(pol)) + "</span>" +
+              "<a class=\"prompt-link\" href=\"" + esc(essaySearchUrl(get(r, "name"))) +
+              "\" target=\"_blank\" rel=\"noopener\">see prompts ↗</a></td>";
             return;
           }
           var v = vals[i];
