@@ -114,3 +114,35 @@ Netlify, or set the publish directory to `site`.
 site/       index.html, styles.css, app.js, data.js (generated, committed)
 pipeline/   build_data.py (stages 0–5), config.py (URLs/fields), requirements.txt
 ```
+
+## Future improvement — build-time ID-mapping for essay-prompt links
+
+**Today's behaviour.** Each school's Application-essay cell links to the *search pages* of the
+My Supplementals and CollegeVine databases. No prompt site supports opening one school's prompts
+by name (My Supplementals deep-links only by internal numeric IDs like `?s=130`; CollegeVine is a
+single top-100 page), so the link drops you on the database and **you type the school name** into
+its search box. Simple and robust, but one extra step per school.
+
+**The alternative: build-time ID-mapping.** At pipeline build time, fetch My Supplementals'
+internal school-ID list, match our ~2,000 schools (by `UNITID` / name) to their IDs, and store each
+ID in `data.js`. The "see prompts" link could then be a **true per-school deep-link**
+(`https://my-supplementals.pages.dev/?s=<id>`) that pre-selects the school — no typing.
+
+**Pros**
+- One click pre-selects the school on My Supplementals — no searching/typing.
+- Best experience for the schools that database covers (1,159, verified for the current cycle).
+
+**Cons**
+- **Fragile.** Their internal IDs and schools list can change every application cycle; when they do,
+  the embedded links silently point to the wrong school or break — with no error to warn us.
+- **Ongoing maintenance.** The ID map must be re-fetched and re-validated each cycle (another moving
+  part in the pipeline, and one more source that can go stale between refreshes).
+- **Coverage gaps + dependency.** Schools they don't list get no link (need a fallback anyway), and
+  the approach leans on scraping their compiled ID data — a gray area under their terms, and it
+  breaks outright if they change their URL scheme.
+- **Still not a clean prompts page.** Even when it works, `?s=<id>` opens their list-*builder* with
+  the school pre-selected, not a dedicated "here are the prompts" view — the user still clicks through.
+
+**Verdict:** deferred. The current search-page links are copyright-safe, zero-maintenance, and never
+silently wrong; the ID-mapping option trades that robustness for saving one search box. Revisit only
+if My Supplementals publishes a stable per-school URL or an official lookup.
