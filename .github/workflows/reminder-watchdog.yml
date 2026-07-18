@@ -1,0 +1,74 @@
+name: Reminder watchdog
+
+# Emails you (via a GitHub issue notification) if the monthly reminder did NOT fire.
+# Runs ~6h after the reminder's 14:00 UTC cron so a normal GitHub delay won't false-alarm.
+
+on:
+  schedule:
+    - cron: '0 20 1 * *'   # 20:00 UTC on the 1st of each month
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Create a one-off TEST alert to confirm the watchdog can notify you"
+        type: boolean
+        default: false
+
+permissions:
+  issues: write
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      OWNER: ${{ github.repository_owner }}
+      SIMULATE: ${{ inputs.simulate_failure }}
+    steps:
+      - name: Alert if this month's reminder issue is missing
+        run: |
+          set -euo pipefail
+
+          # Manual self-test: prove the alert + email path works, then you close the issue.
+          if [ "${SIMULATE:-false}" = "true" ]; then
+            gh issue create --repo "$REPO" \
+              --title "🧪 Watchdog self-test — safe to close" \
+              --assignee "$OWNER" \
+              --body "Confirms the reminder watchdog can open an issue and email you when the monthly reminder fails to fire. No action needed — safe to close."
+            echo "Self-test alert created."
+            exit 0
+          fi
+
+          ym=$(date -u +%Y-%m)
+          echo "Checking for the monthly reminder issue for $ym"
+
+          reminder=$(gh issue list --repo "$REPO" --state all --limit 100 --json title \
+            --jq "[.[] | select(.title | contains(\"automation options ($ym)\"))] | length")
+          reminder=${reminder:-0}
+          if [ "$reminder" -gt 0 ]; then
+            echo "Reminder issue present for $ym — nothing to do."
+            exit 0
+          fi
+
+          # Don't pile up duplicate alerts if this is re-run.
+          alert=$(gh issue list --repo "$REPO" --state all --limit 100 --json title \
+            --jq "[.[] | select(.title | contains(\"did NOT fire ($ym)\"))] | length")
+          alert=${alert:-0}
+          if [ "$alert" -gt 0 ]; then
+            echo "Alert already exists for $ym — skipping."
+            exit 0
+          fi
+
+          echo "No reminder issue for $ym — opening an alert."
+          {
+            printf '@%s — the monthly **College Specs** reminder did **not** create its issue for **%s** by the watchdog check (20:00 UTC on the 1st).\n\n' "$OWNER" "$ym"
+            printf 'Most likely one of:\n'
+            printf -- '- GitHub disabled the scheduled workflows after ~60 days of repo inactivity — open the **Actions** tab and look for a re-enable banner; or\n'
+            printf -- '- the reminder workflow run errored — see https://github.com/%s/actions/workflows/monthly-reminder.yml\n\n' "$REPO"
+            printf 'Fire it manually: **Actions → Monthly reminder → Run workflow**, or `gh workflow run monthly-reminder.yml`.\n\n'
+            printf '(If the reminder actually fired later today, just close this.) *Automated watchdog alert.*\n'
+          } > /tmp/body.md
+          gh issue create --repo "$REPO" \
+            --title "⚠️ Monthly reminder did NOT fire ($ym)" \
+            --assignee "$OWNER" \
+            --body-file /tmp/body.md
