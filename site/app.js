@@ -461,14 +461,17 @@
   });
 
   // Clicking a "see prompts" link copies the school name so it can be pasted into the
-  // database's search box (which we can't pre-fill via URL). The link still opens normally.
+  // database's search box (which we can't pre-fill via URL). We hold the navigation briefly
+  // so the "copied — paste it" toast is visible BEFORE the new tab takes over the screen.
   document.addEventListener("click", function (ev) {
     var link = ev.target.closest("a.prompt-link");
     if (!link) return;
+    ev.preventDefault();
     var school = link.getAttribute("data-school");
-    if (!school) return;
-    copyText(school);
-    showToast("Copied “" + school + "” — press Ctrl+V (⌘V on Mac) in the search box to fill it in");
+    var href = link.href;
+    if (school) copyText(school);
+    showToast("Copied “" + (school || "") + "” — opening the site; press Ctrl+V (⌘V on Mac) in its search box to fill it in");
+    setTimeout(function () { window.open(href, "_blank", "noopener"); }, 1100);
   });
 
   // ------------------------------------------------------------- browse view
