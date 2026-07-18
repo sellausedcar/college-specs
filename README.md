@@ -30,6 +30,33 @@ it, validates it, and rewrites `site/data.js`. Flags:
 - `--skip-download` — rebuild from cached downloads only
 - `--force-download` — re-download everything even if cached
 
+### Automation options (keeping the door open)
+
+The underlying data only changes **~once a year**, so heavy automation isn't worth much.
+Current setup and the paths still on the table:
+
+**Current — manual (recommended).** When new Scorecard/IPEDS data drops, just:
+
+```
+python pipeline/build_data.py
+git commit -am "refresh data"
+git push
+```
+
+…and the site updates itself within a minute (the GitHub Pages deploy workflow runs on push).
+
+**Also active — local weekly scheduled task.** A Windows Task Scheduler job
+(`weekly-refresh.cmd`, machine-local, gitignored) runs the pipeline weekly and pushes only
+if the data changed. Depends on the PC being on around the trigger.
+
+**Deferred — cloud automation via the Scorecard API.** Fully hands-off cloud refresh (GitHub
+Actions) is *not* possible today because the Scorecard bulk-download CDN **IP-blocks GitHub's
+runners** (403). The fix would be to **rewrite the Scorecard fetch to use `api.data.gov`** — a
+different host that isn't IP-blocked. This is a real rewrite (~50 field mappings + pagination)
+and needs a **free API key stored as a GitHub secret** (the key stays server-side, never in the
+published site). Heavier, but truly hands-off. Kept open for later if the manual/local options
+ever stop being enough.
+
 ## Data sources
 
 | Source | What it provides | Vintage |
