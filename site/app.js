@@ -49,6 +49,41 @@
   function titleCase(s) {
     return String(s).toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
   }
+  function copyText(text) {
+    // Copy synchronously via execCommand FIRST — it completes within the click gesture,
+    // before the "see prompts" link opens a new tab and steals focus (which makes the
+    // async Clipboard API reject). Fall back to the Clipboard API only if execCommand fails.
+    if (legacyCopy(text)) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(function () {});
+    }
+  }
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  }
+  var toastTimer;
+  function showToast(msg) {
+    var t = el.toast;
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 4000);
+  }
   function renderMajors(list) {
     return list.map(function (m) {
       return "<div class=\"major-row\"><span class=\"major-name\">" + esc(m[0]) +
@@ -171,7 +206,7 @@
     pickerInput: $("picker-input"), pickerList: $("picker-list"),
     chips: $("chips"), empty: $("compare-empty"), example: $("btn-example"),
     tableWrap: $("compare-table-wrap"), table: $("compare-table"), notes: $("compare-notes"),
-    essayNote: $("essay-note"),
+    essayNote: $("essay-note"), toast: $("toast"),
     fSearch: $("f-search"), fState: $("f-state"), fControl: $("f-control"),
     fSize: $("f-size"), fAdm: $("f-adm"), fNp: $("f-np"), fReset: $("f-reset"),
     browseCount: $("browse-count"), goCompare: $("btn-go-compare"),
@@ -295,12 +330,13 @@
           }
           if (item.key === "essay") {
             var pol = get(r, "essay");
+            var sch = esc(get(r, "name"));
             html += "<td><span class=\"cell-val" + (pol === null ? " cell-na" : "") + "\">" +
               (pol === null ? "N/A" : esc(pol)) + "</span>" +
               "<span class=\"prompt-links\">prompts: " +
-              "<a class=\"prompt-link\" href=\"https://my-supplementals.pages.dev/\" target=\"_blank\" rel=\"noopener\">My Supplementals ↗</a>" +
+              "<a class=\"prompt-link\" data-school=\"" + sch + "\" href=\"https://my-supplementals.pages.dev/\" target=\"_blank\" rel=\"noopener\">My Supplementals ↗</a>" +
               " · " +
-              "<a class=\"prompt-link\" href=\"https://www.collegevine.com/college-essay-prompts/\" target=\"_blank\" rel=\"noopener\">CollegeVine ↗</a>" +
+              "<a class=\"prompt-link\" data-school=\"" + sch + "\" href=\"https://www.collegevine.com/college-essay-prompts/\" target=\"_blank\" rel=\"noopener\">CollegeVine ↗</a>" +
               "</span></td>";
             return;
           }
@@ -422,6 +458,17 @@
   document.addEventListener("click", function (ev) {
     var btn = ev.target.closest("[data-remove]");
     if (btn) removeSchool(Number(btn.getAttribute("data-remove")));
+  });
+
+  // Clicking a "see prompts" link copies the school name so it can be pasted into the
+  // database's search box (which we can't pre-fill via URL). The link still opens normally.
+  document.addEventListener("click", function (ev) {
+    var link = ev.target.closest("a.prompt-link");
+    if (!link) return;
+    var school = link.getAttribute("data-school");
+    if (!school) return;
+    copyText(school);
+    showToast("Copied “" + school + "” — press Ctrl+V (⌘V on Mac) in the search box to fill it in");
   });
 
   // ------------------------------------------------------------- browse view

@@ -82,8 +82,9 @@ statistics for privacy.
 - SAT/ACT ranges are sparse post-test-optional; see each school's test policy row.
 - Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
   site supports opening one school's prompts by name). The Application-essay row links to the
-  My Supplementals and CollegeVine prompt databases (search the school there), and a panel lists
-  the shared Common App personal-statement prompts (attributed).
+  My Supplementals and CollegeVine prompt databases; clicking a link **copies that school's name**
+  so you paste it with **Ctrl+V (⌘V on Mac)** into the database's search box. A panel lists the
+  shared Common App personal-statement prompts (attributed).
 
 ## Deploying
 

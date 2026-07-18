@@ -191,6 +191,18 @@ td.best .cell-val::before { content: "✓ "; color: var(--best-ink); font-weight
 }
 .prompt-link { white-space: nowrap; }
 
+.toast {
+  position: fixed; left: 50%; bottom: 24px;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--ink); color: var(--surface);
+  padding: 11px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 500;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  opacity: 0; pointer-events: none; z-index: 100;
+  max-width: min(92vw, 520px); text-align: center;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 .essay-note {
   margin-top: 14px; border: 1px solid var(--grid); border-radius: 12px;
   background: var(--surface); padding: 0 16px;
