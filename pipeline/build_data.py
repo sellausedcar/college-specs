@@ -253,6 +253,7 @@ def stage1_scorecard(zip_path):
     df["url"] = raw["INSTURL"].str.strip()
     df["control"] = to_num(raw["CONTROL"]).map(config.CONTROL_LABELS)
     df["locale"] = to_num(raw["LOCALE"]).map(config.LOCALE_LABELS)
+    df["carnegie"] = to_num(raw["CCBASIC"]).map(config.CARNEGIE_LABELS)
     df["enrollment"] = to_num(raw["UGDS"]).astype("Int64")
     df["stufac"] = to_num(raw["STUFACR"])
     df["adm_rate"] = to_num(raw["ADM_RATE"])

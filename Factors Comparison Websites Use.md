@@ -356,6 +356,7 @@ Legend: **●** shown · **◐** partial / available but not surfaced · blank =
 | Class-size distribution |  |  | ● |  |  |  |
 | Faculty credentials (% terminal, % female) |  |  | ● |  |  |  |
 | Academic offerings / policies (gen-ed, study options) |  |  | ● |  |  |  |
+| Carnegie classification / research tier (R1/R2…) |  |  |  |  |  | ● |
 
 ### Campus Life & Safety
 | Factor | Scorecard | Navigator | CDS | CollegeSimply | Niche | **Your Tool** |

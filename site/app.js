@@ -183,7 +183,7 @@
     { group: "Size & setting", items: [
       { key: "control" }, { key: "locale" }, { key: "enrollment" }] },
     { group: "Academics", items: [
-      { key: "stufac" }, { key: "majors" }] },
+      { key: "carnegie" }, { key: "stufac" }, { key: "majors" }] },
     { group: "Admissions", items: [
       { key: "adm_rate" }, { key: "app_fee" },
       { range: ["sat_v25", "sat_v75"], label: "SAT EBRW (25th–75th)" },

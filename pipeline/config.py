@@ -56,7 +56,7 @@ HTTP_HEADERS = {
 SCORECARD_COLS = [
     # identity / filtering
     "UNITID", "OPEID", "OPEID6", "INSTNM", "CITY", "STABBR", "INSTURL",
-    "CONTROL", "LOCALE", "MAIN", "CURROPER", "PREDDEG", "HIGHDEG",
+    "CONTROL", "LOCALE", "MAIN", "CURROPER", "PREDDEG", "HIGHDEG", "CCBASIC",
     # size & setting
     "UGDS", "STUFACR",
     # admissions
@@ -98,6 +98,36 @@ LOCALE_LABELS = {
     21: "Suburb: Large", 22: "Suburb: Midsize", 23: "Suburb: Small",
     31: "Town: Fringe", 32: "Town: Distant", 33: "Town: Remote",
     41: "Rural: Fringe", 42: "Rural: Distant", 43: "Rural: Remote",
+}
+
+# Carnegie Basic Classification (CCBASIC) -> concise tier label. Official labels verified
+# against the Scorecard data dictionary; R1/R2 and M1/M2/M3 are the standard shorthand.
+# Codes -2/0 (not classified) and 1-9 (associate's, out of our 4-year scope) fall to N/A.
+CARNEGIE_LABELS = {
+    15: "R1: Doctoral – Very High Research",
+    16: "R2: Doctoral – High Research",
+    17: "Doctoral / Professional University",
+    18: "M1: Master's – Larger Programs",
+    19: "M2: Master's – Medium Programs",
+    20: "M3: Master's – Small Programs",
+    21: "Baccalaureate: Arts & Sciences (Liberal Arts)",
+    22: "Baccalaureate: Diverse Fields",
+    23: "Baccalaureate / Associate's: Mixed",
+    14: "Baccalaureate / Associate's: Associate's-Dominant",
+    24: "Special Focus: Faith-Related",
+    25: "Special Focus: Medical Schools & Centers",
+    26: "Special Focus: Health Professions",
+    27: "Special Focus: Research Institution",
+    28: "Special Focus: Engineering & Technology",
+    29: "Special Focus: Business & Management",
+    30: "Special Focus: Arts, Music & Design",
+    31: "Special Focus: Law",
+    32: "Special Focus: Other",
+    33: "Tribal College",
+    10: "Special Focus (2-yr): Health Professions",
+    11: "Special Focus (2-yr): Technical",
+    12: "Special Focus (2-yr): Arts & Design",
+    13: "Special Focus (2-yr): Other",
 }
 
 # Race/ethnicity shares of undergraduate enrollment: (output key, Scorecard col, label)
@@ -176,6 +206,8 @@ FIELDS = [
     # -- size & setting
     {"key": "control",   "label": "Type",               "group": "size", "type": "str",  "better": "neutral", "source": "scorecard"},
     {"key": "locale",    "label": "Setting",            "group": "size", "type": "str",  "better": "neutral", "source": "scorecard"},
+    {"key": "carnegie",  "label": "Carnegie classification", "group": "acad", "type": "str", "better": "neutral", "source": "scorecard",
+     "note": "Carnegie Basic Classification — institution type & research intensity (R1/R2 = doctoral research universities)"},
     {"key": "enrollment","label": "Undergrad enrollment","group": "size","type": "int",  "better": "neutral", "source": "scorecard"},
     {"key": "stufac",    "label": "Student-faculty ratio","group": "size","type": "ratio","better": "lower",  "source": "scorecard"},
     # -- admissions
