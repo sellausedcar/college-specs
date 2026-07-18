@@ -1,0 +1,52 @@
+name: Refresh data
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # 06:00 UTC every Monday
+  workflow_dispatch:        # allow manual runs from the Actions tab
+
+permissions:
+  contents: write   # commit refreshed data.js
+  pages: write      # deploy the site
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pipeline dependencies
+        run: pip install -r pipeline/requirements.txt
+
+      - name: Rebuild dataset
+        run: python pipeline/build_data.py
+
+      - name: Commit refreshed data (only if changed)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- site/data.js; then
+            echo "No data change this run."
+          else
+            git commit -m "Automated weekly data refresh" -- site/data.js
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
