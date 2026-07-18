@@ -471,7 +471,7 @@
     var href = link.href;
     if (school) copyText(school);
     showToast("Copied “" + (school || "") + "” — opening the site; press Ctrl+V (⌘V on Mac) in its search box to fill it in");
-    setTimeout(function () { window.open(href, "_blank", "noopener"); }, 1100);
+    setTimeout(function () { window.open(href, "_blank", "noopener"); }, 3000);
   });
 
   // ------------------------------------------------------------- browse view
