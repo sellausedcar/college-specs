@@ -46,10 +46,6 @@
     if (!u) return null;
     return /^https?:\/\//i.test(u) ? u : "https://" + u;
   }
-  function essaySearchUrl(name) {
-    return "https://www.google.com/search?q=" +
-      encodeURIComponent("\"" + name + "\" supplemental essay prompts");
-  }
   function titleCase(s) {
     return String(s).toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
   }
@@ -301,8 +297,11 @@
             var pol = get(r, "essay");
             html += "<td><span class=\"cell-val" + (pol === null ? " cell-na" : "") + "\">" +
               (pol === null ? "N/A" : esc(pol)) + "</span>" +
-              "<a class=\"prompt-link\" href=\"" + esc(essaySearchUrl(get(r, "name"))) +
-              "\" target=\"_blank\" rel=\"noopener\">see prompts ↗</a></td>";
+              "<span class=\"prompt-links\">prompts: " +
+              "<a class=\"prompt-link\" href=\"https://my-supplementals.pages.dev/\" target=\"_blank\" rel=\"noopener\">My Supplementals ↗</a>" +
+              " · " +
+              "<a class=\"prompt-link\" href=\"https://www.collegevine.com/college-essay-prompts/\" target=\"_blank\" rel=\"noopener\">CollegeVine ↗</a>" +
+              "</span></td>";
             return;
           }
           var v = vals[i];

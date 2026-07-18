@@ -80,9 +80,10 @@ statistics for privacy.
 - Clery counts are *reported on-campus incidents* — reporting practices vary, and
   rates are not a complete measure of safety.
 - SAT/ACT ranges are sparse post-test-optional; see each school's test policy row.
-- Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly).
-  The Application-essay row links each school to a live search for its current supplemental
-  prompts, and a panel lists the shared Common App personal-statement prompts (attributed).
+- Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
+  site supports opening one school's prompts by name). The Application-essay row links to the
+  My Supplementals and CollegeVine prompt databases (search the school there), and a panel lists
+  the shared Common App personal-statement prompts (attributed).
 
 ## Deploying
 

@@ -186,9 +186,10 @@ td.best .cell-val::before { content: "✓ "; color: var(--best-ink); font-weight
 .major-name { color: var(--ink); }
 .major-pct { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-.prompt-link {
-  display: inline-block; margin-top: 4px; font-size: 12.5px; white-space: nowrap;
+.prompt-links {
+  display: block; margin-top: 5px; font-size: 12px; color: var(--muted); line-height: 1.5;
 }
+.prompt-link { white-space: nowrap; }
 
 .essay-note {
   margin-top: 14px; border: 1px solid var(--grid); border-radius: 12px;
