@@ -1,0 +1,25 @@
+name: Monthly reminder
+
+on:
+  schedule:
+    - cron: '0 14 1 * *'   # 14:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open monthly reminder issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Monthly reminder — data refresh & automation options ($(date +%Y-%m))" \
+            --assignee "${{ github.repository_owner }}" \
+            --body-file .github/reminder-body.md
