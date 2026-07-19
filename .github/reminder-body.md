@@ -19,6 +19,6 @@ on the My Supplementals / CollegeVine databases where **you type the school name
 box. A **“build-time ID-mapping” option** would instead pre-select the school so you don't have to
 type it — **more efficient, but more fragile** (it breaks silently whenever those databases change
 their internal IDs or data, which can happen every application cycle). Deferred for now; full pros &
-cons in [README → Future improvement](https://github.com/sellausedcar/college-specs/blob/master/README.md#future-improvement--build-time-id-mapping-for-essay-prompt-links).
+cons in [README → Future improvements](https://github.com/sellausedcar/college-specs/blob/master/README.md#build-time-id-mapping-for-essay-prompt-links).
 
 *(Automated monthly reminder — close this issue once you've refreshed, or just ignore it.)*

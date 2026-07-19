@@ -116,7 +116,9 @@ site/       index.html, styles.css, app.js, data.js (generated, committed)
 pipeline/   build_data.py (stages 0–5), config.py (URLs/fields), requirements.txt
 ```
 
-## Future improvement — build-time ID-mapping for essay-prompt links
+## Future improvements
+
+### Build-time ID-mapping for essay-prompt links
 
 **Today's behaviour.** Each school's Application-essay cell links to the *search pages* of the
 My Supplementals and CollegeVine databases. No prompt site supports opening one school's prompts
@@ -147,3 +149,19 @@ ID in `data.js`. The "see prompts" link could then be a **true per-school deep-l
 **Verdict:** deferred. The current search-page links are copyright-safe, zero-maintenance, and never
 silently wrong; the ID-mapping option trades that robustness for saving one search box. Revisit only
 if My Supplementals publishes a stable per-school URL or an official lookup.
+
+### "See rankings" links to external ranking sites
+
+Analogous to the essay **"see prompts"** links, add **"see rankings"** links that open the major
+college-ranking sites. Rankings are proprietary/copyrighted, so these would link **out** to the
+sites (like the prompt-database links) rather than embedding any ranking data. Planned targets:
+
+- **U.S. News — Best Colleges (National Universities):** <https://www.usnews.com/best-colleges/rankings/national-universities>
+- **Forbes — America's Top Colleges:** <https://www.forbes.com/top-colleges/>
+- **Niche — grades & rankings:** <https://www.niche.com/colleges/search/best-colleges/>
+- **CollegeSimply — The Best Colleges:** <https://www.collegesimply.com/guides/the-best-colleges/>
+
+Notes: these are general "best colleges" **list pages**, not per-school, so — like the prompt
+databases — they can't be deep-linked to a specific school by name (and U.S. News gates its full
+rankings behind sign-in). Decide the final set/placement when implementing (you mentioned "three
+links" but listed four sites).
