@@ -49,6 +49,25 @@ HTTP_HEADERS = {
     )
 }
 
+# CollegeData.FYI — a community aggregator that parses colleges' Common Data Set filings
+# into a queryable table. We use it for one field the federal sources don't carry: the
+# average high-school GPA of enrolled first-years (CDS item C12, field id C.1201).
+#
+# This is OPTIONAL enrichment, treated very differently from the federal sources:
+#   * Coverage is small — only the few hundred schools whose CDS it has parsed (~13%).
+#   * It is a single-maintainer project that could change or disappear, so a fetch
+#     failure must never fail the build; the pipeline just leaves GPA blank and moves on.
+# The API is a public Supabase/PostgREST endpoint; the anon key below is published on the
+# site's API page and is read-only (safe to commit — it grants nothing but public reads).
+COLLEGEDATA_API_URL = "https://api.collegedata.fyi/rest/v1/cds_fields"
+COLLEGEDATA_GPA_FIELD_ID = "C.1201"
+COLLEGEDATA_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzZHV3bXlndm1kb3pocHZ6YWl4Iiwicm9sZSI6ImFub24i"
+    "LCJpYXQiOjE3NzYxMDk3NTksImV4cCI6MjA5MTY4NTc1OX0."
+    "fYZOIHyrOWzidgc-CVxWCY5Fe9pQk12-6YjDIS6y9qs"
+)
+
 # ---------------------------------------------------------------------------
 # Scorecard columns to read (of ~3,300) and row filter
 # ---------------------------------------------------------------------------
@@ -220,6 +239,8 @@ FIELDS = [
     {"key": "sat_avg",   "label": "SAT average",        "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
     {"key": "act_25",    "label": "ACT 25th pct",       "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
     {"key": "act_75",    "label": "ACT 75th pct",       "group": "adm",  "type": "int",  "better": "higher",  "source": "scorecard"},
+    {"key": "gpa",       "label": "Avg high-school GPA", "group": "adm",  "type": "num",  "better": "neutral", "source": "collegedata",
+     "note": "Average high-school GPA of enrolled first-years, self-reported in each school's Common Data Set (via collegedata.fyi). Reporting scales vary (weighted vs. unweighted), so values can exceed 4.0 and are not directly comparable across schools. Only the few hundred schools whose CDS is published are covered; others show N/A."},
     {"key": "test_policy","label": "Test scores",       "group": "adm",  "type": "str",  "better": "neutral", "source": "scorecard"},
     {"key": "essay",     "label": "Application essay",   "group": "adm",  "type": "str",  "better": "neutral", "source": "ipeds_adm"},
     {"key": "yield",     "label": "Yield (enrolled / admitted)", "group": "adm", "type": "frac", "better": "higher", "source": "ipeds_adm"},

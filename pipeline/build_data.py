@@ -402,6 +402,95 @@ def stage2c_app_fee(df, ic_zip):
 
 
 # ---------------------------------------------------------------------------
+# Stage 2d: CollegeData.FYI average high-school GPA (Common Data Set item C12)
+#
+# Optional, best-effort enrichment. Unlike the federal sources this must NEVER fail the
+# build: a fetch error, an offline --skip-download, or an empty/renamed API all degrade
+# gracefully to an all-N/A gpa column so the rest of the pipeline is unaffected.
+# ---------------------------------------------------------------------------
+
+def fetch_collegedata_gpa(skip, force):
+    """Return raw GPA rows (list of dicts) from collegedata.fyi, or None. Never raises."""
+    dest = CACHE / "collegedata_gpa.json"
+    if dest.exists() and not force:
+        log(f"  cached: {dest.name}")
+        try:
+            return json.loads(dest.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001 - unreadable cache falls through to refetch
+            log(f"  cached GPA file unreadable ({e}); refetching")
+    if skip:
+        log("  --skip-download and no usable GPA cache; leaving GPA blank")
+        return None
+    params = {
+        "select": ("ipeds_id,school_name,canonical_year,year_start,value_num,"
+                   "value_status,sub_institutional,data_quality_flag"),
+        "field_id": "eq." + config.COLLEGEDATA_GPA_FIELD_ID,
+        "value_num": "not.is.null",
+        "data_quality_flag": "is.null",   # drop blank-template / mis-parsed rows at the source
+        "limit": "10000",
+    }
+    headers = dict(config.HTTP_HEADERS)
+    headers["apikey"] = config.COLLEGEDATA_ANON_KEY
+    headers["Authorization"] = "Bearer " + config.COLLEGEDATA_ANON_KEY
+    try:
+        log(f"  GET {config.COLLEGEDATA_API_URL} (field {config.COLLEGEDATA_GPA_FIELD_ID})")
+        r = requests.get(config.COLLEGEDATA_API_URL, params=params, headers=headers, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+        dest.write_text(json.dumps(rows), encoding="utf-8")
+        log(f"  saved: {dest.name} ({len(rows):,} rows)")
+        return rows
+    except Exception as e:  # noqa: BLE001 - optional source; a failure is never fatal
+        log(f"  WARNING: GPA fetch failed ({e}); continuing without GPA")
+        return None
+
+
+def parse_collegedata_gpa(rows):
+    """Clean raw GPA rows -> (DataFrame[unitid, gpa], cycle-span string) or (None, None)."""
+    if not rows:
+        return None, None
+    g = pd.DataFrame(rows)
+    if "value_num" not in g.columns or "ipeds_id" not in g.columns:
+        log("  WARNING: unexpected GPA payload shape; skipping GPA")
+        return None, None
+    g = g[g["value_num"].notna()].copy()
+    if "data_quality_flag" in g.columns:              # belt-and-suspenders vs the server filter
+        g = g[g["data_quality_flag"].isna()]
+    if "value_status" in g.columns:
+        g = g[g["value_status"].fillna("reported") == "reported"]
+    if "sub_institutional" in g.columns:              # keep the main institution, not sub-campuses
+        g = g[g["sub_institutional"].isna()]
+    g["unitid"] = to_num(g["ipeds_id"]).astype("Int64")
+    g["gpa"] = to_num(g["value_num"])
+    g = g.dropna(subset=["unitid", "gpa"])
+    # Guard against non-reports and parse noise. Schools that leave CDS C12 blank (many
+    # test-optional/holistic ones — Duke, Georgetown, Williams…) surface as 0.0; no real
+    # average enrolled-first-year GPA is below 2.0. Weighted scales legitimately exceed 4.0
+    # (UNC 4.47, Georgia Tech 4.14), so the upper bound allows up to a 5.0 weighted scale.
+    g = g[(g["gpa"] >= 2.0) & (g["gpa"] <= 5.0)]
+    yr = to_num(g["year_start"]) if "year_start" in g.columns else pd.Series(0, index=g.index)
+    g = g.assign(_yr=yr).sort_values("_yr", ascending=False).drop_duplicates("unitid")
+    if g.empty:
+        return None, None
+    years = sorted(str(y) for y in g.get("canonical_year", pd.Series(dtype=str)).dropna().unique())
+    span = f"{years[0]}–{years[-1]}" if len(years) > 1 else (years[0] if years else "recent cycles")
+    return g[["unitid", "gpa"]].reset_index(drop=True), span
+
+
+def stage2d_gpa(df, skip, force):
+    log("=== Stage 2d: CollegeData.FYI average HS GPA ===")
+    gpa, span = parse_collegedata_gpa(fetch_collegedata_gpa(skip, force))
+    if gpa is None:
+        df["gpa"] = pd.NA
+        log(f"  GPA unavailable; column N/A for all {len(df):,} schools")
+        return df, None
+    df = df.merge(gpa, on="unitid", how="left")
+    df["gpa"] = to_num(df["gpa"]).round(2)
+    log(f"  GPA coverage: {df['gpa'].notna().sum():,}/{len(df):,} (CDS cycles {span})")
+    return df, span
+
+
+# ---------------------------------------------------------------------------
 # Stage 3: Opportunity Insights mobility
 # ---------------------------------------------------------------------------
 
@@ -641,6 +730,7 @@ def main():
     df = stage2_yield(df, paths["adm"])
     df = stage2b_grant_aid(df, paths["sfa"])
     df = stage2c_app_fee(df, paths["ic"])
+    df, gpa_span = stage2d_gpa(df, args.skip_download, args.force_download)
     df = stage3_oi(df, paths["oi1"], paths["oi11"])
     df, clery_years = stage4_clery(df, paths["clery"])
 
@@ -651,6 +741,8 @@ def main():
         "ipeds_adm": f"IPEDS ADM {adm_year}",
         "ipeds_sfa": f"IPEDS SFA (grant aid) {sfa_span}",
         "ipeds_ic": f"IPEDS IC (application fee) {ic_year}",
+        "collegedata": ("Common Data Set avg HS GPA via collegedata.fyi"
+                        + (f", {gpa_span} cycles" if gpa_span else "")),
         "oi": f"Opportunity Insights, {config.OI_VINTAGE}",
         "clery": f"Campus Safety and Security, {clery_span}",
     }

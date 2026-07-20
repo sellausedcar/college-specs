@@ -66,6 +66,7 @@ ever stop being enough.
 | [IPEDS SFA survey](https://nces.ed.gov/ipeds/use-the-data) (NCES) | Average grant & scholarship aid to first-time undergraduates | Pipeline probes for the newest `SFA*.zip` |
 | [IPEDS ADM survey](https://nces.ed.gov/ipeds/use-the-data) (NCES) | Application-essay policy (`ADMCON11`) | Same file as yield |
 | [IPEDS IC survey](https://nces.ed.gov/ipeds/use-the-data) (NCES) | Undergraduate application fee | Newest `IC*.zip` that contains the fee column |
+| [collegedata.fyi](https://www.collegedata.fyi) (community Common Data Set aggregator) | Average high-school GPA of enrolled first-years (CDS item C12) | Parses schools' published CDS filings; ~200 schools, 2024-25/2025-26 cycles |
 | [Opportunity Insights](https://opportunityinsights.org/data/) Mobility Report Cards | Economic mobility: low-income access, success rate, mobility rate | Static (2017–18 release, 1980–91 birth cohorts) |
 | [Campus Safety & Security](https://ope.ed.gov/campussafety/) (Clery Act) | On-campus violent/property incident rates per 1,000 students (3-yr avg) | Latest 3-calendar-year release |
 
@@ -80,6 +81,14 @@ statistics for privacy.
 - Clery counts are *reported on-campus incidents* — reporting practices vary, and
   rates are not a complete measure of safety.
 - SAT/ACT ranges are sparse post-test-optional; see each school's test policy row.
+- **Average high-school GPA** comes from schools' self-reported Common Data Sets (via the
+  community aggregator collegedata.fyi), so it covers only the ~200 schools that publish a CDS
+  *and* fill in that item — many holistic/test-optional schools (e.g. Duke, MIT) leave it blank,
+  which correctly renders as N/A rather than a value. Reporting **scales vary** (weighted vs.
+  unweighted), so figures above 4.0 occur and aren't directly comparable between schools — the
+  row is shown without best-in-row highlighting for that reason. This source is optional
+  enrichment: if its API is unavailable at build time, the pipeline leaves GPA blank and
+  continues, so a refresh never fails on it.
 - Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
   site supports opening one school's prompts by name). The Application-essay row links to the
   My Supplementals and CollegeVine prompt databases; clicking a link **copies that school's name**

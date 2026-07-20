@@ -226,6 +226,7 @@
       { range: ["sat_m25", "sat_m75"], label: "SAT Math (25th–75th)" },
       { key: "sat_avg" },
       { range: ["act_25", "act_75"], label: "ACT composite (25th–75th)" },
+      { key: "gpa" },
       { key: "test_policy" }, { key: "essay" }, { key: "yield" }] },
     { group: "Cost", items: [
       { key: "tuition_in" }, { key: "tuition_out" }, { key: "cost_attend" },
