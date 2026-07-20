@@ -127,6 +127,44 @@ pipeline/   build_data.py (stages 0–5), config.py (URLs/fields), requirements.
 
 ## Future improvements
 
+### Admission-factor importance (CDS section C7)
+
+**What it is.** The Common Data Set's section **C7** is each school's own rating of how much it
+weighs ~18 admission factors — the "what does this school actually focus on?" data (one school
+leans on rigor + essays + character; a big state school leans on GPA + test scores). Every factor
+is rated on a 4-level scale: **Very Important / Important / Considered / Not Considered**, split
+into academic and nonacademic groups.
+
+**Source — verified present.** collegedata.fyi carries the whole C7 table as fields
+`C.701`–`C.718` (confirmed live: e.g. Davidson reads rigor/essay/character = *Very Important*,
+class rank/GPA = *Considered*, interview/alumni/residency = *Not Considered*). Expected
+field → factor mapping (confirm against the CDS C7 template when building — the level *values*
+were verified empirically, the field-number-to-label mapping was not):
+
+| Field | Factor (academic) | Field | Factor (nonacademic) |
+|---|---|---|---|
+| `C.701` | Rigor of secondary school record | `C.710` | Character / personal qualities |
+| `C.702` | Class rank | `C.711` | First generation |
+| `C.703` | Academic GPA | `C.712` | Alumni/ae relation |
+| `C.704` | Recommendation(s) | `C.713` | Geographical residence |
+| `C.705` | Standardized test scores | `C.714` | State residency |
+| `C.706` | Application essay | `C.715` | Religious affiliation / commitment |
+| `C.707` | Interview | `C.716` | Volunteer work |
+| `C.708` | Extracurricular activities | `C.717` | Work experience |
+| `C.709` | Talent / ability | `C.718` | Level of applicant's interest |
+
+**Build approach — same as the shipped GPA feature.** Add a best-effort pipeline stage (mirror
+`stage2d_gpa` / `fetch_collegedata_gpa` in `build_data.py`) that pulls these fields from
+collegedata.fyi, joins by IPEDS `UNITID`, dedupes to the newest cycle, and degrades to N/A on any
+failure so a refresh never breaks on this third-party source. **Filter parse noise:** keep only the
+four canonical labels — stray values like `X`, `VI`, `✔` appear in the raw data and must be dropped.
+Coverage is bounded by the same aggregator universe as GPA (~200 schools; N/A for the rest).
+
+**Presentation (decided).** Add all 18 factors as individual rows in the compare view, inside a
+**collapsible group** (collapsed by default so it doesn't overwhelm the table, expandable to reveal
+the full academic/nonacademic breakdown). This will be the first collapsible row-group in the
+compare view, so it also introduces that UI affordance.
+
 ### Build-time ID-mapping for essay-prompt links
 
 **Today's behaviour.** Each school's Application-essay cell links to the *search pages* of the
