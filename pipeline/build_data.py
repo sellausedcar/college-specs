@@ -26,6 +26,7 @@ import config  # noqa: E402
 
 CACHE = Path(__file__).parent / "cache"
 SITE = Path(__file__).parent.parent / "site"
+DOCS = Path(__file__).parent.parent / "docs"
 
 
 def log(msg):
@@ -549,14 +550,43 @@ def fetch_collegedata_c7(skip, force):
         return None
 
 
+def _c7_dropped_summary(g, bad, kept_unitids):
+    """Summarize the schools *removed* by the guards (had data pre-guard, none survived).
+    Returns a list of {unitid, category, pattern} dicts for the transparency doc."""
+    label = {fid: lbl for fid, _k, lbl in config.COLLEGEDATA_C7_FIELDS}
+    removed = set(g["unitid"].dropna().unique()) - set(kept_unitids)
+    bad_rows = g[bad & g["unitid"].isin(removed)]
+    out = []
+    for uid, grp in bad_rows.groupby("unitid"):
+        cycles = sorted(grp["_yr"].dropna().unique(), reverse=True)
+        newest = grp[grp["_yr"] == cycles[0]] if cycles else grp
+        vc = newest["level"].value_counts()
+        n, distinct, top = int(vc.sum()), len(vc), (int(vc.iloc[0]) if len(vc) else 0)
+        ctx = int((newest["field_id"].isin(config.C7_CONTEXTUAL_FIELDS)
+                   & newest["level"].eq("Very Important")).sum())
+        both = " (both cycles)" if len(cycles) > 1 else ""
+        if n >= 10 and distinct == 1:
+            val = vc.index[0]
+            cat = "vi" if val == "Very Important" else "nc"
+            pattern = f"all {n} = {val}{both}"
+        elif ctx >= 3:
+            cat, pattern = "vi", f"{top} of {n} = Very Important{both}"
+        else:
+            fields = ", ".join(label[f] for f in sorted(newest["field_id"].unique()))
+            cat, pattern = "frag", f"{n} field{'s' if n != 1 else ''} only ({fields}); no academic factor"
+        out.append({"unitid": int(uid), "category": cat, "pattern": pattern})
+    return out
+
+
 def parse_collegedata_c7(rows):
-    """Clean raw C7 rows -> (wide DataFrame[unitid, c7_*...], cycle-span string) or (None, None)."""
+    """Clean raw C7 rows -> (wide DataFrame[unitid, c7_*...], cycle-span, dropped-summary list).
+    On no usable data returns (None, None, [])."""
     if not rows:
-        return None, None
+        return None, None, []
     g = pd.DataFrame(rows)
     if not {"value_text", "ipeds_id", "field_id"} <= set(g.columns):
         log("  WARNING: unexpected C7 payload shape; skipping C7")
-        return None, None
+        return None, None, []
     g = g[g["value_text"].notna()].copy()
     if "data_quality_flag" in g.columns:              # belt-and-suspenders vs the server filter
         g = g[g["data_quality_flag"].isna()]
@@ -574,13 +604,13 @@ def parse_collegedata_c7(rows):
     g["_yr"] = to_num(g["year_start"]) if "year_start" in g.columns else pd.Series(0, index=g.index)
     g = g.dropna(subset=["unitid", "level", "key"])
     if g.empty:
-        return None, None
+        return None, None, []
     # Guard against source parse failures -- garbled checkbox-grid reads that bleed one
     # column across every factor. Confirmed on real records (e.g. University of Michigan
     # 2025-26, source_format "pdf_flat" / producer "tier4_docling", which reads all 18
     # factors as the identical "Very Important"). These slip past both the server's own
     # data_quality_flag and the noise filter above because the values are well-formed
-    # canonical labels. Two signatures, both evaluated per (school, cycle) so a school's
+    # canonical labels. Three signatures, all evaluated per (school, cycle) so a school's
     # clean cycle still survives when another cycle is bad:
     cycle = ["unitid", "_yr"]
     lvl = g.groupby(cycle)["level"]
@@ -603,26 +633,86 @@ def parse_collegedata_c7(rows):
         n = g.loc[bad, cycle].drop_duplicates().shape[0]
         log(f"  dropping {n:,} garbled school-cycle record(s) (parse failure: uniform, "
             f"implausible contextual factors, or no academic anchor)")
-        g = g[~bad]
-    if g.empty:
-        return None, None
-    g = g.sort_values("_yr", ascending=False).drop_duplicates(["unitid", "key"])  # newest cycle wins per factor
-    years = sorted(str(y) for y in g.get("canonical_year", pd.Series(dtype=str)).dropna().unique())
+    kept = g[~bad]
+    if kept.empty:
+        return None, None, []
+    kept = kept.sort_values("_yr", ascending=False).drop_duplicates(["unitid", "key"])  # newest cycle wins
+    years = sorted(str(y) for y in kept.get("canonical_year", pd.Series(dtype=str)).dropna().unique())
     span = f"{years[0]}–{years[-1]}" if len(years) > 1 else (years[0] if years else "recent cycles")
-    wide = (g.pivot(index="unitid", columns="key", values="level")
-             .reindex(columns=[k for _f, k, _l in config.COLLEGEDATA_C7_FIELDS])
-             .reset_index())                        # reindex guarantees all 18 columns exist
-    return wide, span
+    wide = (kept.pivot(index="unitid", columns="key", values="level")
+                .reindex(columns=[k for _f, k, _l in config.COLLEGEDATA_C7_FIELDS])
+                .reset_index())                     # reindex guarantees all 18 columns exist
+    dropped = _c7_dropped_summary(g, bad, wide["unitid"])
+    return wide, span, dropped
+
+
+C7_DROPPED_BEGIN = "<!-- BEGIN GENERATED: c7-dropped -->"
+C7_DROPPED_END = "<!-- END GENERATED: c7-dropped -->"
+
+
+def write_c7_dropped_doc(df, dropped, span):
+    """Regenerate the table region of docs/c7-dropped-schools.md from this build's dropped
+    set, so the human-readable list never goes stale. Best-effort: never raises, and does
+    nothing if the doc or its markers are absent (the surrounding prose is hand-authored)."""
+    try:
+        doc = DOCS / "c7-dropped-schools.md"
+        if not doc.exists():
+            return
+        text = doc.read_text(encoding="utf-8")
+        i, j = text.find(C7_DROPPED_BEGIN), text.find(C7_DROPPED_END)
+        if i == -1 or j == -1:
+            log("  note: C7 dropped-schools doc has no generated-region markers; skipping")
+            return
+        # Restrict to schools that actually appear on the site (in df). A garbled record for
+        # an out-of-scope institution never shows N/A anywhere a reader would see, so listing
+        # it is just noise (and has no display name to show).
+        name_by_uid = dict(zip(df["unitid"].tolist(), df["name"].tolist()))
+        rows = sorted(({"name": name_by_uid[d["unitid"]], **d}
+                       for d in dropped if d["unitid"] in name_by_uid),
+                      key=lambda r: r["name"].lower())
+        groups = [
+            ("vi", 'Nearly all factors misread as "Very Important"',
+             "The checkbox-grid bleed: every factor — or all but one — collapsed to "
+             "*Very Important*, including implausible ones like religion and state residency."),
+            ("nc", 'All factors misread as "Not Considered"',
+             "Caught by the *uniform* signature; the contextual-implausibility rule alone "
+             "would miss an all-*Not Considered* bleed."),
+            ("frag", "Fragmentary / misaligned parse",
+             "Spreadsheet cells bled into the C7 columns, leaving only stray non-academic "
+             "fields (e.g. a lone spurious `Religion = Very Important`) with none of the "
+             "academic anchors."),
+        ]
+        today = datetime.date.today().isoformat()
+        out = [C7_DROPPED_BEGIN,
+               f"_Generated from the {today} build ({span} cycles) — do not edit this region "
+               f"by hand; `pipeline/build_data.py` overwrites it on every run._", "",
+               f"## Dropped schools ({len(rows)})"]
+        if not rows:
+            out += ["", "_No records were dropped in this build._"]
+        for cat, title, blurb in groups:
+            g = [r for r in rows if r["category"] == cat]
+            if not g:
+                continue
+            out += ["", f"### {title} ({len(g)})", "", blurb, "",
+                    "| School | IPEDS | What the parse produced |", "|---|---|---|"]
+            out += [f"| {r['name']} | {r['unitid']} | {r['pattern']} |" for r in g]
+        out.append("")
+        new = text[:i] + "\n".join(out) + "\n" + text[j:]
+        if new != text:
+            doc.write_text(new, encoding="utf-8")
+            log(f"  wrote {doc.name} ({len(rows)} dropped schools)")
+    except Exception as e:  # noqa: BLE001 - a transparency doc must never fail the build
+        log(f"  WARNING: could not update C7 dropped-schools doc ({e})")
 
 
 def stage2e_c7(df, skip, force):
     log("=== Stage 2e: CollegeData.FYI CDS C7 admission factors ===")
     keys = [k for _f, k, _l in config.COLLEGEDATA_C7_FIELDS]
     try:
-        c7, span = parse_collegedata_c7(fetch_collegedata_c7(skip, force))
+        c7, span, dropped = parse_collegedata_c7(fetch_collegedata_c7(skip, force))
     except Exception as e:  # noqa: BLE001 - optional source must never fail the build
         log(f"  WARNING: C7 parse failed ({e}); continuing without C7")
-        c7, span = None, None
+        c7, span, dropped = None, None, []
     if c7 is None:
         for k in keys:
             df[k] = pd.NA
@@ -631,6 +721,7 @@ def stage2e_c7(df, skip, force):
     df = df.merge(c7, on="unitid", how="left")
     covered = df[keys].notna().any(axis=1).sum()
     log(f"  C7 coverage: {covered:,}/{len(df):,} schools with >=1 factor (CDS cycles {span})")
+    write_c7_dropped_doc(df, dropped, span)
     return df, span
 
 

@@ -10,19 +10,21 @@ confirm it was a bad parse rather than missing data.
 incorrectly.** We show N/A rather than the fabricated values. A school here can reappear in a
 future refresh if the aggregator re-parses it cleanly.
 
-> [!WARNING]
-> **Point-in-time snapshot.** Generated from the 2026-07-22 build (2024-25 / 2025-26
-> cycles). The dropped set changes whenever the aggregator re-parses a school, so re-derive it
-> after a data refresh rather than trusting this list as current — the pipeline reports the
-> current *count* on every run (`dropping N garbled school-cycle records`), and
-> [Regenerating](#regenerating) below reproduces the names.
+> [!NOTE]
+> The table region below is **regenerated automatically** by the pipeline on every build
+> (`write_c7_dropped_doc` in `pipeline/build_data.py`), so it stays in sync with the shipped
+> `site/data.js`. It is a snapshot of the latest build — the dropped set changes whenever the
+> aggregator re-parses a school. Don't hand-edit between the markers; edits there are
+> overwritten on the next run.
+
+<!-- BEGIN GENERATED: c7-dropped -->
+_Generated from the 2026-07-22 build (2024-25–2025-26 cycles) — do not edit this region by hand; `pipeline/build_data.py` overwrites it on every run._
 
 ## Dropped schools (52)
 
 ### Nearly all factors misread as "Very Important" (48)
 
-The checkbox-grid bleed: every factor — or all but one — collapsed to *Very Important*,
-including implausible ones like religion and state residency.
+The checkbox-grid bleed: every factor — or all but one — collapsed to *Very Important*, including implausible ones like religion and state residency.
 
 | School | IPEDS | What the parse produced |
 |---|---|---|
@@ -77,8 +79,7 @@ including implausible ones like religion and state residency.
 
 ### All factors misread as "Not Considered" (1)
 
-Caught by the *uniform* signature; the contextual-implausibility rule alone would miss an
-all-*Not Considered* bleed.
+Caught by the *uniform* signature; the contextual-implausibility rule alone would miss an all-*Not Considered* bleed.
 
 | School | IPEDS | What the parse produced |
 |---|---|---|
@@ -86,19 +87,19 @@ all-*Not Considered* bleed.
 
 ### Fragmentary / misaligned parse (3)
 
-Spreadsheet cells bled into the C7 columns, leaving only stray non-academic fields (e.g. a
-lone spurious `Religion = Very Important`) with none of the academic anchors.
+Spreadsheet cells bled into the C7 columns, leaving only stray non-academic fields (e.g. a lone spurious `Religion = Very Important`) with none of the academic anchors.
 
 | School | IPEDS | What the parse produced |
 |---|---|---|
-| Florida Institute of Technology | 133881 | 1 field(s) only (Interest); no academic factor |
-| Purdue University-Main Campus | 243780 | 2 field(s) only (Extracurriculars, Religion); no academic factor |
-| University of Missouri-Columbia | 178396 | 2 field(s) only (Recommendations, Character); no academic factor |
+| Florida Institute of Technology | 133881 | 1 field only (Level of applicant's interest); no academic factor |
+| Purdue University-Main Campus | 243780 | 2 fields only (Extracurricular activities, Religious affiliation / commitment); no academic factor |
+| University of Missouri-Columbia | 178396 | 2 fields only (Recommendation(s), Character / personal qualities); no academic factor |
+
+<!-- END GENERATED: c7-dropped -->
 
 ## Regenerating
 
-The drop logic lives in `parse_collegedata_c7` (`pipeline/build_data.py`); the field sets it
-keys on are `C7_CONTEXTUAL_FIELDS` and `C7_ANCHOR_FIELDS` in `pipeline/config.py`. To rebuild
-this list from the cached raw feed after a refresh, compare C7 coverage with the guards
-disabled vs. enabled — the difference is the dropped set. (A cleaner long-term option is to
-have stage 2e emit the dropped names at build time; not wired up yet.)
+The list above refreshes automatically whenever you run `python pipeline/build_data.py`
+(the pipeline reports the count on every run: `dropping N garbled school-cycle records`, and
+`wrote c7-dropped-schools.md`). The drop logic lives in `parse_collegedata_c7`; the field
+sets it keys on are `C7_CONTEXTUAL_FIELDS` and `C7_ANCHOR_FIELDS` in `pipeline/config.py`.
