@@ -95,6 +95,18 @@ COLLEGEDATA_C7_FIELDS = [
     ("C.717", "c7_work",        "Work experience"),
     ("C.718", "c7_interest",    "Level of applicant's interest"),
 ]
+# Contextual/nonacademic factors a real institution essentially never rates as its TOP
+# ("Very Important") admission factor. A legitimate record marks at most one of these
+# (a religious college's religion, or a public flagship's state residency); a record that
+# marks several at once is a garbled checkbox-grid parse, not a real CDS submission. Used
+# by stage 2e to detect and drop those bleed records (see parse_collegedata_c7).
+C7_CONTEXTUAL_FIELDS = ("C.712", "C.713", "C.714", "C.715")  # alumni, geography, state res, religion
+# Core academic factors every genuine C7 table rates. A (school, cycle) record that carries
+# NONE of these -- only scattered non-academic fragments -- is a misaligned/partial parse
+# (e.g. a spreadsheet whose SAT cells bled into the C7 columns), and its stray values aren't
+# trustworthy. Requiring *any one* of the four (not a specific one) avoids false-dropping the
+# occasional real record that happens to omit a single academic factor.
+C7_ANCHOR_FIELDS = ("C.701", "C.703", "C.704", "C.705")  # rigor, GPA, test scores, essay
 # normalized value_text -> canonical label; anything else is parse noise and is dropped
 # (the raw data contains stray "x"/"Text"/"0.024"-style values from imperfect parses).
 C7_LEVELS = {

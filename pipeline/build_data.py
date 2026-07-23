@@ -571,12 +571,42 @@ def parse_collegedata_c7(rows):
     norm = g["value_text"].astype(str).str.lower().str.replace(r"[^a-z]", "", regex=True)
     g["level"] = norm.map(config.C7_LEVELS)
     g["key"] = g["field_id"].map({fid: k for fid, k, _l in config.COLLEGEDATA_C7_FIELDS})
+    g["_yr"] = to_num(g["year_start"]) if "year_start" in g.columns else pd.Series(0, index=g.index)
     g = g.dropna(subset=["unitid", "level", "key"])
-    yr = to_num(g["year_start"]) if "year_start" in g.columns else pd.Series(0, index=g.index)
-    g = (g.assign(_yr=yr).sort_values("_yr", ascending=False)
-          .drop_duplicates(["unitid", "key"]))     # newest cycle wins per factor
     if g.empty:
         return None, None
+    # Guard against source parse failures -- garbled checkbox-grid reads that bleed one
+    # column across every factor. Confirmed on real records (e.g. University of Michigan
+    # 2025-26, source_format "pdf_flat" / producer "tier4_docling", which reads all 18
+    # factors as the identical "Very Important"). These slip past both the server's own
+    # data_quality_flag and the noise filter above because the values are well-formed
+    # canonical labels. Two signatures, both evaluated per (school, cycle) so a school's
+    # clean cycle still survives when another cycle is bad:
+    cycle = ["unitid", "_yr"]
+    lvl = g.groupby(cycle)["level"]
+    #   (a) every parsed factor reads the identical rating (>=10 present, all equal) -- also
+    #       catches all-"Not Considered" bleeds, which signature (b) would miss;
+    uniform = (lvl.transform("size") >= 10) & (lvl.transform("nunique") == 1)
+    #   (b) >=3 contextual factors (alumni, geography, state residency, religion) rated
+    #       "Very Important" at once -- implausible for any real school, and the tell for an
+    #       all-"Very Important" bleed that (a) misses when a stray field parses differently.
+    ctx_vi = g["field_id"].isin(config.C7_CONTEXTUAL_FIELDS) & g["level"].eq("Very Important")
+    implausible = ctx_vi.groupby([g["unitid"], g["_yr"]]).transform("sum") >= 3
+    #   (c) none of the core academic anchor factors present -- a genuine C7 table always
+    #       rates rigor/GPA/test scores/essay, so a record with only scattered non-academic
+    #       fragments is a misaligned parse (e.g. Purdue, whose sole surviving cell is a
+    #       spurious religion="Very Important").
+    has_anchor = g["field_id"].isin(config.C7_ANCHOR_FIELDS)
+    anchorless = ~has_anchor.groupby([g["unitid"], g["_yr"]]).transform("any")
+    bad = uniform | implausible | anchorless
+    if bad.any():
+        n = g.loc[bad, cycle].drop_duplicates().shape[0]
+        log(f"  dropping {n:,} garbled school-cycle record(s) (parse failure: uniform, "
+            f"implausible contextual factors, or no academic anchor)")
+        g = g[~bad]
+    if g.empty:
+        return None, None
+    g = g.sort_values("_yr", ascending=False).drop_duplicates(["unitid", "key"])  # newest cycle wins per factor
     years = sorted(str(y) for y in g.get("canonical_year", pd.Series(dtype=str)).dropna().unique())
     span = f"{years[0]}–{years[-1]}" if len(years) > 1 else (years[0] if years else "recent cycles")
     wide = (g.pivot(index="unitid", columns="key", values="level")
