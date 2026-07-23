@@ -610,8 +610,17 @@ def parse_collegedata_c7(rows):
     # 2025-26, source_format "pdf_flat" / producer "tier4_docling", which reads all 18
     # factors as the identical "Very Important"). These slip past both the server's own
     # data_quality_flag and the noise filter above because the values are well-formed
-    # canonical labels. Three signatures, all evaluated per (school, cycle) so a school's
-    # clean cycle still survives when another cycle is bad:
+    # canonical labels.
+    #
+    # NB: filtering by the aggregator's own provenance (producer / source_format) was
+    # investigated and rejected. The garbled records concentrate in the lowest-tier PDF
+    # parser (tier4_docling / pdf_flat, ~22% garbled) -- but that same tier produces ~3x more
+    # *clean* records than bad, so dropping it wholesale discards far more good data than it
+    # saves, and no (school, cycle) is parsed by more than one producer (so there is nothing
+    # to prefer between). Detecting the garbled *output* below is the better signal.
+    #
+    # Three signatures, all evaluated per (school, cycle) so a school's clean cycle still
+    # survives when another cycle is bad:
     cycle = ["unitid", "_yr"]
     lvl = g.groupby(cycle)["level"]
     #   (a) every parsed factor reads the identical rating (>=10 present, all equal) -- also
