@@ -202,22 +202,27 @@ databases — they can't be deep-linked to a specific school by name (and U.S. N
 rankings behind sign-in). Decide the final set/placement when implementing (you mentioned "three
 links" but listed four sites).
 
-### "Find the Common Data Set" search link for dropped / N/A admission factors
+### "Find the Common Data Set" search link for schools dropped by the C7 guards
 
-When a school shows **N/A** for the *Admission factors* group — because its C7 parse was dropped
-by the [parse-failure guards](#caveats) (its real CDS exists but was parsed badly; see
-[`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md)), or because the aggregator never
-covered it — add a small **"find the Common Data Set"** link next to that N/A that runs a Google
-search for the school's CDS, so the reader can open the actual filing and read section C7
-themselves.
+For a school whose *Admission factors* show **N/A because its C7 record was dropped by the
+[parse-failure guards](#caveats)** — i.e. it **is** in collegedata.fyi and its real CDS exists,
+but the parse was garbled (see [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md)) — add a
+small **"find the Common Data Set"** link next to the N/A that runs a Google search for that
+school's CDS, so the reader can open the actual filing and read section C7 themselves. It turns a
+dead-end N/A into a one-click path to the source, for schools whose CDS is *known* to exist.
 
-Like the essay **"see prompts"** and proposed **"see rankings"** links, this embeds **no data** —
-it's just a search URL built at render time from the school name, e.g.
-`https://www.google.com/search?q=%22University+of+Michigan%22+%22Common+Data+Set%22`. Zero
-maintenance, copyright-safe, no per-school ID map, and it works for every school. It's especially
-worthwhile for the dropped schools, whose real CDS is known to exist — turning a dead-end N/A into
-a one-click path to the source data.
+**Scope: dropped schools only.** A school that does **not** appear in collegedata.fyi at all gets
+**no link** — its N/A stays as-is. This is deliberately a targeted "our source mangled this
+school's CDS, here's how to find the real one" affordance, not a generic search on every N/A.
 
-Notes: decide whether to show it only on dropped/N/A schools or on every school's row; consider
-appending the latest cycle (e.g. `2024-25`) to the query to bias toward the current CDS; Google
-search URLs are stable and need no API key.
+Like the essay **"see prompts"** and proposed **"see rankings"** links, it embeds **no data** —
+just a search URL built at render time from the school name, e.g.
+`https://www.google.com/search?q=%22University+of+Michigan%22+%22Common+Data+Set%22`.
+Copyright-safe, no per-school ID map, no API key.
+
+**Implementation note.** The site can't currently distinguish a *dropped* N/A from a
+*never-covered* one — both are just `null` in `data.js`. So this needs the pipeline to expose the
+dropped-school set to the front-end (it's already computed in stage 2e and written to
+`docs/c7-dropped-schools.md`; e.g. emit those UNITIDs into `data.js` so `app.js` can show the link
+only for them). Optionally append the latest cycle (e.g. `2024-25`) to the query to bias toward
+the current CDS.
