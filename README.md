@@ -201,3 +201,23 @@ Notes: these are general "best colleges" **list pages**, not per-school, so — 
 databases — they can't be deep-linked to a specific school by name (and U.S. News gates its full
 rankings behind sign-in). Decide the final set/placement when implementing (you mentioned "three
 links" but listed four sites).
+
+### "Find the Common Data Set" search link for dropped / N/A admission factors
+
+When a school shows **N/A** for the *Admission factors* group — because its C7 parse was dropped
+by the [parse-failure guards](#caveats) (its real CDS exists but was parsed badly; see
+[`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md)), or because the aggregator never
+covered it — add a small **"find the Common Data Set"** link next to that N/A that runs a Google
+search for the school's CDS, so the reader can open the actual filing and read section C7
+themselves.
+
+Like the essay **"see prompts"** and proposed **"see rankings"** links, this embeds **no data** —
+it's just a search URL built at render time from the school name, e.g.
+`https://www.google.com/search?q=%22University+of+Michigan%22+%22Common+Data+Set%22`. Zero
+maintenance, copyright-safe, no per-school ID map, and it works for every school. It's especially
+worthwhile for the dropped schools, whose real CDS is known to exist — turning a dead-end N/A into
+a one-click path to the source data.
+
+Notes: decide whether to show it only on dropped/N/A schools or on every school's row; consider
+appending the latest cycle (e.g. `2024-25`) to the query to bias toward the current CDS; Google
+search URLs are stable and need no API key.
