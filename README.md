@@ -92,12 +92,28 @@ statistics for privacy.
 - **Admission factors (CDS section C7)** — each school's own rating of how much it weighs
   18 admission factors (Very Important / Important / Considered / Not Considered), shown in
   the compare view as a collapsible "Admission factors" group (collapsed by default). Same
-  source and coverage bounds as GPA: only the ~300 schools with parsed CDS filings; the rest
+  source and coverage bounds as GPA: only the ~250 schools with parsed CDS filings; the rest
   show N/A, and any fetch failure degrades to N/A without breaking a refresh. The
   field-id→factor mapping (`C.701`–`C.718`, in CDS-template order — academic factors
   C.701–706, nonacademic C.707–718) was verified against the aggregator's rendered school
   pages and corroborated externally (Pitzer, publicly test-free, reads
   `C.704` Standardized test scores = Not Considered).
+  - **Parse-failure guards.** The aggregator parses these ratings out of PDFs and
+    spreadsheets, and some records come back garbled in ways that pass its own quality flag
+    with well-formed values (e.g. a checkbox grid mis-read so that a school rates *all* 18
+    factors "Very Important"). Because a bad value looks identical to a real one, `stage2e_c7`
+    in `build_data.py` drops a whole `(school, cycle)` record — evaluated per cycle, so a
+    school's clean cycle survives when another is bad — on any of three signatures:
+    (a) ≥10 factors present and *all identical* (uniform bleed); (b) ≥3 of the four
+    contextual factors (alumni relation, geographical residence, state residency, religious
+    affiliation) rated "Very Important" at once — implausible for any real school, yet a
+    legitimate record still marks at most one, e.g. a religious college's religion or a public
+    flagship's state residency; (c) *no* academic-anchor factor present (rigor / GPA / test
+    scores / essay), which flags misaligned or fragmentary parses. These heuristics catch the
+    patterns seen to date (~68 records, dropping coverage from ~305 to ~253 schools); a future
+    refresh could surface a new failure shape, so it's worth re-checking coverage after
+    refreshes. The field-id sets driving the guards live in `config.py`
+    (`C7_CONTEXTUAL_FIELDS`, `C7_ANCHOR_FIELDS`).
 - Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
   site supports opening one school's prompts by name). The Application-essay row links to the
   My Supplementals and CollegeVine prompt databases; clicking a link **copies that school's name**
