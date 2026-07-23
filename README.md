@@ -113,7 +113,9 @@ statistics for privacy.
     patterns seen to date (~68 records, dropping coverage from ~305 to ~253 schools); a future
     refresh could surface a new failure shape, so it's worth re-checking coverage after
     refreshes. The field-id sets driving the guards live in `config.py`
-    (`C7_CONTEXTUAL_FIELDS`, `C7_ANCHOR_FIELDS`).
+    (`C7_CONTEXTUAL_FIELDS`, `C7_ANCHOR_FIELDS`). The specific schools dropped — several
+    well-known (Northwestern, Caltech, Michigan), whose CDS *parse* failed rather than being
+    absent — are listed in [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md).
 - Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
   site supports opening one school's prompts by name). The Application-essay row links to the
   My Supplementals and CollegeVine prompt databases; clicking a link **copies that school's name**
