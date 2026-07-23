@@ -66,7 +66,7 @@ ever stop being enough.
 | [IPEDS SFA survey](https://nces.ed.gov/ipeds/use-the-data) (NCES) | Average grant & scholarship aid to first-time undergraduates | Pipeline probes for the newest `SFA*.zip` |
 | [IPEDS ADM survey](https://nces.ed.gov/ipeds/use-the-data) (NCES) | Application-essay policy (`ADMCON11`) | Same file as yield |
 | [IPEDS IC survey](https://nces.ed.gov/ipeds/use-the-data) (NCES) | Undergraduate application fee | Newest `IC*.zip` that contains the fee column |
-| [collegedata.fyi](https://www.collegedata.fyi) (community Common Data Set aggregator) | Average high-school GPA of enrolled first-years (CDS item C12) | Parses schools' published CDS filings; ~200 schools, 2024-25/2025-26 cycles |
+| [collegedata.fyi](https://www.collegedata.fyi) (community Common Data Set aggregator) | Average high-school GPA of enrolled first-years (CDS item C12); admission-factor importance ratings (CDS section C7) | Parses schools' published CDS filings; ~200-300 schools, 2024-25/2025-26 cycles |
 | [Opportunity Insights](https://opportunityinsights.org/data/) Mobility Report Cards | Economic mobility: low-income access, success rate, mobility rate | Static (2017–18 release, 1980–91 birth cohorts) |
 | [Campus Safety & Security](https://ope.ed.gov/campussafety/) (Clery Act) | On-campus violent/property incident rates per 1,000 students (3-yr avg) | Latest 3-calendar-year release |
 
@@ -89,6 +89,15 @@ statistics for privacy.
   row is shown without best-in-row highlighting for that reason. This source is optional
   enrichment: if its API is unavailable at build time, the pipeline leaves GPA blank and
   continues, so a refresh never fails on it.
+- **Admission factors (CDS section C7)** — each school's own rating of how much it weighs
+  18 admission factors (Very Important / Important / Considered / Not Considered), shown in
+  the compare view as a collapsible "Admission factors" group (collapsed by default). Same
+  source and coverage bounds as GPA: only the ~300 schools with parsed CDS filings; the rest
+  show N/A, and any fetch failure degrades to N/A without breaking a refresh. The
+  field-id→factor mapping (`C.701`–`C.718`, in CDS-template order — academic factors
+  C.701–706, nonacademic C.707–718) was verified against the aggregator's rendered school
+  pages and corroborated externally (Pitzer, publicly test-free, reads
+  `C.704` Standardized test scores = Not Considered).
 - Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
   site supports opening one school's prompts by name). The Application-essay row links to the
   My Supplementals and CollegeVine prompt databases; clicking a link **copies that school's name**
@@ -126,44 +135,6 @@ pipeline/   build_data.py (stages 0–5), config.py (URLs/fields), requirements.
 ```
 
 ## Future improvements
-
-### Admission-factor importance (CDS section C7)
-
-**What it is.** The Common Data Set's section **C7** is each school's own rating of how much it
-weighs ~18 admission factors — the "what does this school actually focus on?" data (one school
-leans on rigor + essays + character; a big state school leans on GPA + test scores). Every factor
-is rated on a 4-level scale: **Very Important / Important / Considered / Not Considered**, split
-into academic and nonacademic groups.
-
-**Source — verified present.** collegedata.fyi carries the whole C7 table as fields
-`C.701`–`C.718` (confirmed live: e.g. Davidson reads rigor/essay/character = *Very Important*,
-class rank/GPA = *Considered*, interview/alumni/residency = *Not Considered*). Expected
-field → factor mapping (confirm against the CDS C7 template when building — the level *values*
-were verified empirically, the field-number-to-label mapping was not):
-
-| Field | Factor (academic) | Field | Factor (nonacademic) |
-|---|---|---|---|
-| `C.701` | Rigor of secondary school record | `C.710` | Character / personal qualities |
-| `C.702` | Class rank | `C.711` | First generation |
-| `C.703` | Academic GPA | `C.712` | Alumni/ae relation |
-| `C.704` | Recommendation(s) | `C.713` | Geographical residence |
-| `C.705` | Standardized test scores | `C.714` | State residency |
-| `C.706` | Application essay | `C.715` | Religious affiliation / commitment |
-| `C.707` | Interview | `C.716` | Volunteer work |
-| `C.708` | Extracurricular activities | `C.717` | Work experience |
-| `C.709` | Talent / ability | `C.718` | Level of applicant's interest |
-
-**Build approach — same as the shipped GPA feature.** Add a best-effort pipeline stage (mirror
-`stage2d_gpa` / `fetch_collegedata_gpa` in `build_data.py`) that pulls these fields from
-collegedata.fyi, joins by IPEDS `UNITID`, dedupes to the newest cycle, and degrades to N/A on any
-failure so a refresh never breaks on this third-party source. **Filter parse noise:** keep only the
-four canonical labels — stray values like `X`, `VI`, `✔` appear in the raw data and must be dropped.
-Coverage is bounded by the same aggregator universe as GPA (~200 schools; N/A for the rest).
-
-**Presentation (decided).** Add all 18 factors as individual rows in the compare view, inside a
-**collapsible group** (collapsed by default so it doesn't overwhelm the table, expandable to reveal
-the full academic/nonacademic breakdown). This will be the first collapsible row-group in the
-compare view, so it also introduces that UI affordance.
 
 ### Build-time ID-mapping for essay-prompt links
 

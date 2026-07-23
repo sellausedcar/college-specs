@@ -50,13 +50,15 @@ HTTP_HEADERS = {
 }
 
 # CollegeData.FYI — a community aggregator that parses colleges' Common Data Set filings
-# into a queryable table. We use it for one field the federal sources don't carry: the
-# average high-school GPA of enrolled first-years (CDS item C12, field id C.1201).
+# into a queryable table. We use it for fields the federal sources don't carry: the
+# average high-school GPA of enrolled first-years (CDS item C12, field id C.1201) and
+# the admission-factor importance ratings (CDS section C7, field ids C.701–C.718).
 #
 # This is OPTIONAL enrichment, treated very differently from the federal sources:
 #   * Coverage is small — only the few hundred schools whose CDS it has parsed (~13%).
 #   * It is a single-maintainer project that could change or disappear, so a fetch
-#     failure must never fail the build; the pipeline just leaves GPA blank and moves on.
+#     failure must never fail the build; the pipeline just leaves the fields blank and
+#     moves on.
 # The API is a public Supabase/PostgREST endpoint; the anon key below is published on the
 # site's API page and is read-only (safe to commit — it grants nothing but public reads).
 COLLEGEDATA_API_URL = "https://api.collegedata.fyi/rest/v1/cds_fields"
@@ -66,6 +68,46 @@ COLLEGEDATA_ANON_KEY = (
     "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzZHV3bXlndm1kb3pocHZ6YWl4Iiwicm9sZSI6ImFub24i"
     "LCJpYXQiOjE3NzYxMDk3NTksImV4cCI6MjA5MTY4NTc1OX0."
     "fYZOIHyrOWzidgc-CVxWCY5Fe9pQk12-6YjDIS6y9qs"
+)
+
+# CDS section C7: each school's own rating of how much it weighs 18 admission factors.
+# (field_id, output key, display label) in CDS-template order: academic C.701–706,
+# nonacademic C.707–718. The field-number→factor mapping was verified empirically
+# against the aggregator's rendered school pages (Davidson 2024-25 full table) and
+# corroborated externally (Pitzer, publicly test-free, reads C.704 = Not Considered).
+COLLEGEDATA_C7_FIELDS = [
+    ("C.701", "c7_rigor",       "Rigor of secondary school record"),
+    ("C.702", "c7_class_rank",  "Class rank"),
+    ("C.703", "c7_gpa",         "Academic GPA"),
+    ("C.704", "c7_test_scores", "Standardized test scores"),
+    ("C.705", "c7_essay",       "Application essay"),
+    ("C.706", "c7_recs",        "Recommendation(s)"),
+    ("C.707", "c7_interview",   "Interview"),
+    ("C.708", "c7_extracurric", "Extracurricular activities"),
+    ("C.709", "c7_talent",      "Talent / ability"),
+    ("C.710", "c7_character",   "Character / personal qualities"),
+    ("C.711", "c7_first_gen",   "First generation"),
+    ("C.712", "c7_alumni",      "Alumni/ae relation"),
+    ("C.713", "c7_geography",   "Geographical residence"),
+    ("C.714", "c7_state_res",   "State residency"),
+    ("C.715", "c7_religion",    "Religious affiliation / commitment"),
+    ("C.716", "c7_volunteer",   "Volunteer work"),
+    ("C.717", "c7_work",        "Work experience"),
+    ("C.718", "c7_interest",    "Level of applicant's interest"),
+]
+# normalized value_text -> canonical label; anything else is parse noise and is dropped
+# (the raw data contains stray "x"/"Text"/"0.024"-style values from imperfect parses).
+C7_LEVELS = {
+    "veryimportant": "Very Important",
+    "important":     "Important",
+    "considered":    "Considered",
+    "notconsidered": "Not Considered",
+}
+C7_NOTE = (
+    "The school's own rating of how much it weighs this factor in admissions "
+    "(Very Important / Important / Considered / Not Considered), from its Common "
+    "Data Set, section C7 (via collegedata.fyi). Only the few hundred schools "
+    "with parsed CDS filings are covered; others show N/A."
 )
 
 # ---------------------------------------------------------------------------
@@ -244,6 +286,10 @@ FIELDS = [
     {"key": "test_policy","label": "Test scores",       "group": "adm",  "type": "str",  "better": "neutral", "source": "scorecard"},
     {"key": "essay",     "label": "Application essay",   "group": "adm",  "type": "str",  "better": "neutral", "source": "ipeds_adm"},
     {"key": "yield",     "label": "Yield (enrolled / admitted)", "group": "adm", "type": "frac", "better": "higher", "source": "ipeds_adm"},
+    # -- CDS C7 admission-factor importance (generated from COLLEGEDATA_C7_FIELDS)
+    *[{"key": k, "label": lbl, "group": "adm", "type": "str",
+       "better": "neutral", "source": "collegedata", "note": C7_NOTE}
+      for _fid, k, lbl in COLLEGEDATA_C7_FIELDS],
     # -- cost
     {"key": "tuition_in", "label": "Tuition (in-state)",   "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "tuition_out","label": "Tuition (out-of-state)","group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},

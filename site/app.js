@@ -177,6 +177,7 @@
   var browse = { q: "", state: "", control: "", size: "", adm: "", np: "",
                  sortKey: "enrollment", sortDir: -1, limit: 300 };
   var applyingHash = false;
+  var collapsedGroups = { c7: true };      // collapsible compare groups, collapsed by default
 
   function writeHash() {
     var h = view === "browse" ? "#browse"
@@ -228,6 +229,9 @@
       { range: ["act_25", "act_75"], label: "ACT composite (25th–75th)" },
       { key: "gpa" },
       { key: "test_policy" }, { key: "essay" }, { key: "yield" }] },
+    { group: "Admission factors", id: "c7", collapsible: true,
+      items: DATA.fields.filter(function (f) { return f.key.indexOf("c7_") === 0; })
+                        .map(function (f) { return { key: f.key }; }) },
     { group: "Cost", items: [
       { key: "tuition_in" }, { key: "tuition_out" }, { key: "cost_attend" },
       { key: "net_price" }, { key: "grant_aid" },
@@ -302,8 +306,19 @@
     });
 
     ROWS.forEach(function (grp) {
-      html += "<tr class=\"group-row\"><td>" + esc(grp.group) + "</td>" +
-              "<td colspan=\"" + rows.length + "\"></td></tr>";
+      var open = !grp.collapsible || !collapsedGroups[grp.id];
+      html += "<tr class=\"group-row\"" + (grp.collapsible ? " data-group=\"" + grp.id + "\"" : "") + "><td>";
+      html += grp.collapsible
+        ? "<button type=\"button\" class=\"group-toggle\" data-group=\"" + grp.id +
+          "\" aria-expanded=\"" + open + "\"><span class=\"caret\" aria-hidden=\"true\">▸</span>" +
+          esc(grp.group) + "</button>"
+        : esc(grp.group);
+      html += "</td><td colspan=\"" + rows.length + "\">" +
+              (grp.collapsible && !open
+                ? "<span class=\"group-hint\">" + grp.items.length + " factors — click to expand</span>"
+                : "") +
+              "</td></tr>";
+      if (!open) return;               // skip item rows while collapsed
       grp.items.forEach(function (item) {
         var meta = itemMeta(item);
         var vals = rows.map(function (r) { return itemValue(item, r); });
@@ -459,6 +474,16 @@
   document.addEventListener("click", function (ev) {
     var btn = ev.target.closest("[data-remove]");
     if (btn) removeSchool(Number(btn.getAttribute("data-remove")));
+  });
+
+  document.addEventListener("click", function (ev) {
+    var t = ev.target.closest("[data-group]");
+    if (!t) return;
+    var g = t.getAttribute("data-group");
+    collapsedGroups[g] = !collapsedGroups[g];
+    renderCompare();
+    var btn2 = el.table.querySelector("button.group-toggle[data-group=\"" + g + "\"]");
+    if (btn2) btn2.focus();            // re-render destroys the old button; restore keyboard focus
   });
 
   // Clicking a "see prompts" link copies the school name so it can be pasted into the

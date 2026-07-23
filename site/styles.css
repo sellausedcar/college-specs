@@ -167,6 +167,22 @@ main { max-width: 1200px; margin: 0 auto; padding: 18px 20px 40px; }
 .spec-table tr.group-row td:first-child {
   position: sticky; left: 0; z-index: 10; white-space: nowrap;
 }
+.spec-table tr.group-row[data-group] td { cursor: pointer; }
+.group-toggle {
+  font: inherit; font-weight: inherit; text-transform: inherit; letter-spacing: inherit;
+  color: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.group-toggle:hover { color: var(--accent); }
+.group-toggle .caret {
+  display: inline-block; font-size: 11px; color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.group-toggle[aria-expanded="true"] .caret { transform: rotate(90deg); }
+.group-hint {
+  color: var(--muted); font-weight: 400; font-size: 12.5px;
+  text-transform: none; letter-spacing: normal;
+}
 .spec-table tbody tr:not(.group-row):hover td { background: var(--hover); }
 .spec-table tbody tr:not(.group-row):hover td.rowlabel { background: var(--page); }
 

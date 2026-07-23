@@ -491,6 +491,120 @@ def stage2d_gpa(df, skip, force):
 
 
 # ---------------------------------------------------------------------------
+# Stage 2e: CollegeData.FYI admission-factor importance (Common Data Set section C7)
+#
+# Optional, best-effort enrichment like stage 2d: any failure degrades to all-N/A
+# c7_* columns, never a failed build. Unlike the single-shot GPA fetch this one must
+# paginate — the server caps every response at 1,000 rows regardless of `limit`
+# (and `Prefer: count=exact` times out server-side, so total size is unknowable upfront).
+# ---------------------------------------------------------------------------
+
+C7_MAX_PAGES = 40  # 40k rows, >5x current volume; growth past this means revisit the design
+
+
+def fetch_collegedata_c7(skip, force):
+    """Return raw C7 rows (list of dicts) from collegedata.fyi, or None. Never raises."""
+    dest = CACHE / "collegedata_c7.json"
+    if dest.exists() and not force:
+        log(f"  cached: {dest.name}")
+        try:
+            return json.loads(dest.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001 - unreadable cache falls through to refetch
+            log(f"  cached C7 file unreadable ({e}); refetching")
+    if skip:
+        log("  --skip-download and no usable C7 cache; leaving C7 blank")
+        return None
+    params = {
+        "select": ("ipeds_id,school_name,field_id,canonical_year,year_start,value_text,"
+                   "value_status,sub_institutional,data_quality_flag"),
+        "field_id": "in.(" + ",".join(fid for fid, _k, _l in config.COLLEGEDATA_C7_FIELDS) + ")",
+        "value_text": "not.is.null",
+        "data_quality_flag": "is.null",   # drop blank-template / mis-parsed rows at the source
+        "order": "ipeds_id.asc,field_id.asc,year_start.asc",  # stable order for offset paging
+        "limit": "1000",
+    }
+    headers = dict(config.HTTP_HEADERS)
+    headers["apikey"] = config.COLLEGEDATA_ANON_KEY
+    headers["Authorization"] = "Bearer " + config.COLLEGEDATA_ANON_KEY
+    rows = []
+    try:
+        log(f"  GET {config.COLLEGEDATA_API_URL} (fields C.701-C.718, paginated)")
+        for page_no in range(C7_MAX_PAGES):
+            r = requests.get(config.COLLEGEDATA_API_URL,
+                             params=params | {"offset": str(len(rows))},
+                             headers=headers, timeout=60)
+            r.raise_for_status()
+            page = r.json()
+            if not page:
+                break
+            rows.extend(page)
+            log(f"  page {page_no + 1}: {len(page):,} rows (total {len(rows):,})")
+        else:
+            log(f"  WARNING: C7 pagination hit the {C7_MAX_PAGES}-page cap; using what we have")
+        dest.write_text(json.dumps(rows), encoding="utf-8")
+        log(f"  saved: {dest.name} ({len(rows):,} rows)")
+        return rows
+    except Exception as e:  # noqa: BLE001 - optional source; a failure is never fatal
+        log(f"  WARNING: C7 fetch failed ({e}); continuing without C7")
+        return None
+
+
+def parse_collegedata_c7(rows):
+    """Clean raw C7 rows -> (wide DataFrame[unitid, c7_*...], cycle-span string) or (None, None)."""
+    if not rows:
+        return None, None
+    g = pd.DataFrame(rows)
+    if not {"value_text", "ipeds_id", "field_id"} <= set(g.columns):
+        log("  WARNING: unexpected C7 payload shape; skipping C7")
+        return None, None
+    g = g[g["value_text"].notna()].copy()
+    if "data_quality_flag" in g.columns:              # belt-and-suspenders vs the server filter
+        g = g[g["data_quality_flag"].isna()]
+    if "value_status" in g.columns:
+        g = g[g["value_status"].fillna("reported") == "reported"]
+    if "sub_institutional" in g.columns:              # keep the main institution, not sub-campuses
+        g = g[g["sub_institutional"].isna()]
+    g["unitid"] = to_num(g["ipeds_id"]).astype("Int64")
+    # Guard against parse noise: the raw data holds stray values ("x", "Text", "0.024",
+    # "NotConsidered"…). Normalizing to lowercase letters and mapping onto the four
+    # canonical labels keeps mis-spaced variants and drops everything else.
+    norm = g["value_text"].astype(str).str.lower().str.replace(r"[^a-z]", "", regex=True)
+    g["level"] = norm.map(config.C7_LEVELS)
+    g["key"] = g["field_id"].map({fid: k for fid, k, _l in config.COLLEGEDATA_C7_FIELDS})
+    g = g.dropna(subset=["unitid", "level", "key"])
+    yr = to_num(g["year_start"]) if "year_start" in g.columns else pd.Series(0, index=g.index)
+    g = (g.assign(_yr=yr).sort_values("_yr", ascending=False)
+          .drop_duplicates(["unitid", "key"]))     # newest cycle wins per factor
+    if g.empty:
+        return None, None
+    years = sorted(str(y) for y in g.get("canonical_year", pd.Series(dtype=str)).dropna().unique())
+    span = f"{years[0]}–{years[-1]}" if len(years) > 1 else (years[0] if years else "recent cycles")
+    wide = (g.pivot(index="unitid", columns="key", values="level")
+             .reindex(columns=[k for _f, k, _l in config.COLLEGEDATA_C7_FIELDS])
+             .reset_index())                        # reindex guarantees all 18 columns exist
+    return wide, span
+
+
+def stage2e_c7(df, skip, force):
+    log("=== Stage 2e: CollegeData.FYI CDS C7 admission factors ===")
+    keys = [k for _f, k, _l in config.COLLEGEDATA_C7_FIELDS]
+    try:
+        c7, span = parse_collegedata_c7(fetch_collegedata_c7(skip, force))
+    except Exception as e:  # noqa: BLE001 - optional source must never fail the build
+        log(f"  WARNING: C7 parse failed ({e}); continuing without C7")
+        c7, span = None, None
+    if c7 is None:
+        for k in keys:
+            df[k] = pd.NA
+        log(f"  C7 unavailable; columns N/A for all {len(df):,} schools")
+        return df, None
+    df = df.merge(c7, on="unitid", how="left")
+    covered = df[keys].notna().any(axis=1).sum()
+    log(f"  C7 coverage: {covered:,}/{len(df):,} schools with >=1 factor (CDS cycles {span})")
+    return df, span
+
+
+# ---------------------------------------------------------------------------
 # Stage 3: Opportunity Insights mobility
 # ---------------------------------------------------------------------------
 
@@ -731,6 +845,7 @@ def main():
     df = stage2b_grant_aid(df, paths["sfa"])
     df = stage2c_app_fee(df, paths["ic"])
     df, gpa_span = stage2d_gpa(df, args.skip_download, args.force_download)
+    df, c7_span = stage2e_c7(df, args.skip_download, args.force_download)
     df = stage3_oi(df, paths["oi1"], paths["oi11"])
     df, clery_years = stage4_clery(df, paths["clery"])
 
@@ -741,8 +856,9 @@ def main():
         "ipeds_adm": f"IPEDS ADM {adm_year}",
         "ipeds_sfa": f"IPEDS SFA (grant aid) {sfa_span}",
         "ipeds_ic": f"IPEDS IC (application fee) {ic_year}",
-        "collegedata": ("Common Data Set avg HS GPA via collegedata.fyi"
-                        + (f", {gpa_span} cycles" if gpa_span else "")),
+        "collegedata": ("Common Data Set (avg HS GPA, admission factors) via collegedata.fyi"
+                        + (f", {' / '.join(s for s in dict.fromkeys([gpa_span, c7_span]) if s)} cycles"
+                           if gpa_span or c7_span else "")),
         "oi": f"Opportunity Insights, {config.OI_VINTAGE}",
         "clery": f"Campus Safety and Security, {clery_span}",
     }
