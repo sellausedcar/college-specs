@@ -502,22 +502,35 @@ def stage2d_gpa(df, skip, force):
 
 C7_MAX_PAGES = 40  # 40k rows, >5x current volume; growth past this means revisit the design
 
+# Columns pulled from the aggregator's cds_fields table. `school_id` (the aggregator's slug)
+# and `archive_url` (the archived CDS filing for that school-cycle) are not used by the merge
+# -- they are carried so a dropped school can be linked straight to its source document
+# instead of a bare N/A. Verified populated for every C7 row of every currently-dropped
+# school; see docs/c7-dropped-schools.md.
+C7_SELECT = ("ipeds_id,school_id,school_name,field_id,canonical_year,year_start,value_text,"
+             "value_status,sub_institutional,data_quality_flag,archive_url")
+
 
 def fetch_collegedata_c7(skip, force):
     """Return raw C7 rows (list of dicts) from collegedata.fyi, or None. Never raises."""
     dest = CACHE / "collegedata_c7.json"
     if dest.exists() and not force:
-        log(f"  cached: {dest.name}")
         try:
-            return json.loads(dest.read_text(encoding="utf-8"))
+            cached = json.loads(dest.read_text(encoding="utf-8"))
         except Exception as e:  # noqa: BLE001 - unreadable cache falls through to refetch
             log(f"  cached C7 file unreadable ({e}); refetching")
+        else:
+            # A cache written before C7_SELECT last changed lacks the newer columns; refetch
+            # so they appear. Under --skip-download stale columns still beat no data at all.
+            if not cached or set(C7_SELECT.split(",")) <= set(cached[0]) or skip:
+                log(f"  cached: {dest.name}")
+                return cached
+            log(f"  cached {dest.name} predates the current column list; refetching")
     if skip:
         log("  --skip-download and no usable C7 cache; leaving C7 blank")
         return None
     params = {
-        "select": ("ipeds_id,school_name,field_id,canonical_year,year_start,value_text,"
-                   "value_status,sub_institutional,data_quality_flag"),
+        "select": C7_SELECT,
         "field_id": "in.(" + ",".join(fid for fid, _k, _l in config.COLLEGEDATA_C7_FIELDS) + ")",
         "value_text": "not.is.null",
         "data_quality_flag": "is.null",   # drop blank-template / mis-parsed rows at the source
@@ -552,7 +565,7 @@ def fetch_collegedata_c7(skip, force):
 
 def _c7_dropped_summary(g, bad, kept_unitids):
     """Summarize the schools *removed* by the guards (had data pre-guard, none survived).
-    Returns a list of {unitid, category, pattern} dicts for the transparency doc."""
+    Returns a list of {unitid, category, pattern, archive_url} dicts for the transparency doc."""
     label = {fid: lbl for fid, _k, lbl in config.COLLEGEDATA_C7_FIELDS}
     removed = set(g["unitid"].dropna().unique()) - set(kept_unitids)
     bad_rows = g[bad & g["unitid"].isin(removed)]
@@ -574,7 +587,11 @@ def _c7_dropped_summary(g, bad, kept_unitids):
         else:
             fields = ", ".join(label[f] for f in sorted(newest["field_id"].unique()))
             cat, pattern = "frag", f"{n} field{'s' if n != 1 else ''} only ({fields}); no academic factor"
-        out.append({"unitid": int(uid), "category": cat, "pattern": pattern})
+        # The archived filing for the cycle `pattern` describes, so a reader can open the real
+        # C7 table. Absent from caches written before C7_SELECT carried it, hence the guard.
+        urls = newest["archive_url"].dropna() if "archive_url" in newest.columns else []
+        out.append({"unitid": int(uid), "category": cat, "pattern": pattern,
+                    "archive_url": str(urls.iloc[0]) if len(urls) else None})
     return out
 
 
@@ -659,6 +676,16 @@ C7_DROPPED_BEGIN = "<!-- BEGIN GENERATED: c7-dropped -->"
 C7_DROPPED_END = "<!-- END GENERATED: c7-dropped -->"
 
 
+def _c7_school_cell(r):
+    """Table cell for a dropped school: a link to its archived CDS filing when we have one,
+    otherwise the bare name."""
+    url = r.get("archive_url")
+    if not url:
+        return r["name"]
+    name = r["name"].replace("]", "\\]")   # a bracketed name would otherwise break the link
+    return f"[{name}]({url})"
+
+
 def write_c7_dropped_doc(df, dropped, span):
     """Regenerate the table region of docs/c7-dropped-schools.md from this build's dropped
     set, so the human-readable list never goes stale. Best-effort: never raises, and does
@@ -704,7 +731,9 @@ def write_c7_dropped_doc(df, dropped, span):
                 continue
             out += ["", f"### {title} ({len(g)})", "", blurb, "",
                     "| School | IPEDS | What the parse produced |", "|---|---|---|"]
-            out += [f"| {r['name']} | {r['unitid']} | {r['pattern']} |" for r in g]
+            # School name links to the archived CDS when the aggregator gave us a URL, so a
+            # reader can check the real C7 table against what the parse produced.
+            out += [f"| {_c7_school_cell(r)} | {r['unitid']} | {r['pattern']} |" for r in g]
         out.append("")
         new = text[:i] + "\n".join(out) + "\n" + text[j:]
         if new != text:
