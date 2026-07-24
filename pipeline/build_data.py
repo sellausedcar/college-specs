@@ -765,6 +765,152 @@ def stage2e_c7(df, skip, force):
 
 
 # ---------------------------------------------------------------------------
+# Stage 2f: CollegeData.FYI merit aid & admission-policy detail (CDS H2A, C2, C21, C22)
+#
+# Optional, best-effort enrichment like stages 2d/2e: any failure degrades to all-N/A columns,
+# never a failed build. Paginated like C7 -- the fields combined exceed the server's
+# 1,000-row page cap.
+# ---------------------------------------------------------------------------
+
+COLLEGEDATA_EXTRA_SELECT = ("ipeds_id,field_id,canonical_year,year_start,value_text,value_num,"
+                            "value_status,sub_institutional,data_quality_flag")
+
+_EXTRA_FIELD_IDS = ([fid for fid, _k in config.COLLEGEDATA_EXTRA_NUM_FIELDS]
+                    + [fid for fid, _k in config.COLLEGEDATA_EXTRA_BOOL_FIELDS])
+
+
+def fetch_collegedata_extra(skip, force):
+    """Return raw rows for the stage-2f CDS fields from collegedata.fyi, or None. Never raises."""
+    dest = CACHE / "collegedata_extra.json"
+    if dest.exists() and not force:
+        try:
+            cached = json.loads(dest.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001 - unreadable cache falls through to refetch
+            log(f"  cached extra-fields file unreadable ({e}); refetching")
+        else:
+            # A cache written before COLLEGEDATA_EXTRA_SELECT changed lacks the newer columns;
+            # refetch so they appear. Under --skip-download stale columns still beat no data.
+            if not cached or set(COLLEGEDATA_EXTRA_SELECT.split(",")) <= set(cached[0]) or skip:
+                log(f"  cached: {dest.name}")
+                return cached
+            log(f"  cached {dest.name} predates the current column list; refetching")
+    if skip:
+        log("  --skip-download and no usable extra-fields cache; leaving these columns blank")
+        return None
+    params = {
+        "select": COLLEGEDATA_EXTRA_SELECT,
+        "field_id": "in.(" + ",".join(_EXTRA_FIELD_IDS) + ")",
+        "or": "(value_text.not.is.null,value_num.not.is.null)",
+        "data_quality_flag": "is.null",   # drop blank-template / mis-parsed rows at the source
+        "order": "ipeds_id.asc,field_id.asc,year_start.asc",  # stable order for offset paging
+        "limit": "1000",
+    }
+    headers = dict(config.HTTP_HEADERS)
+    headers["apikey"] = config.COLLEGEDATA_ANON_KEY
+    headers["Authorization"] = "Bearer " + config.COLLEGEDATA_ANON_KEY
+    rows = []
+    try:
+        log(f"  GET {config.COLLEGEDATA_API_URL} (extra CDS fields, paginated)")
+        for page_no in range(C7_MAX_PAGES):
+            r = requests.get(config.COLLEGEDATA_API_URL,
+                             params=params | {"offset": str(len(rows))},
+                             headers=headers, timeout=60)
+            r.raise_for_status()
+            page = r.json()
+            if not page:
+                break
+            rows.extend(page)
+            log(f"  page {page_no + 1}: {len(page):,} rows (total {len(rows):,})")
+        else:
+            log(f"  WARNING: extra-fields pagination hit the {C7_MAX_PAGES}-page cap; using what we have")
+        dest.write_text(json.dumps(rows), encoding="utf-8")
+        log(f"  saved: {dest.name} ({len(rows):,} rows)")
+        return rows
+    except Exception as e:  # noqa: BLE001 - optional source; a failure is never fatal
+        log(f"  WARNING: extra-fields fetch failed ({e}); continuing without them")
+        return None
+
+
+def parse_collegedata_extra(rows):
+    """Clean raw stage-2f rows -> wide DataFrame[unitid, <extra keys>...], or None.
+    Never raises on bad input; returns None when nothing usable survives."""
+    if not rows:
+        return None
+    g = pd.DataFrame(rows)
+    if not {"ipeds_id", "field_id"} <= set(g.columns):
+        log("  WARNING: unexpected extra-fields payload shape; skipping")
+        return None
+    if "data_quality_flag" in g.columns:              # belt-and-suspenders vs the server filter
+        g = g[g["data_quality_flag"].isna()]
+    if "value_status" in g.columns:                   # drop parse_error / non-reported values
+        g = g[g["value_status"].fillna("reported") == "reported"]
+    if "sub_institutional" in g.columns:              # keep the main institution, not sub-campuses
+        g = g[g["sub_institutional"].isna()]
+    g = g.copy()
+    g["unitid"] = to_num(g["ipeds_id"]).astype("Int64")
+    g["_yr"] = to_num(g["year_start"]) if "year_start" in g.columns else pd.Series(0, index=g.index)
+    g = g.dropna(subset=["unitid"])
+
+    frames = []
+    # Numeric fields (merit counts/dollars, wait-list admits): pull value_num. Rows the source
+    # couldn't parse cleanly are already excluded above (value_status != "reported" leaves
+    # value_num null), and dropna below removes anything still non-numeric.
+    num_map = {fid: key for fid, key in config.COLLEGEDATA_EXTRA_NUM_FIELDS}
+    num = g[g["field_id"].isin(num_map)].copy() if "value_num" in g.columns else g.iloc[0:0].copy()
+    if not num.empty:
+        num["key"] = num["field_id"].map(num_map)
+        num["val"] = to_num(num["value_num"])
+        num = num.dropna(subset=["key", "val"])
+        num = num.sort_values("_yr", ascending=False).drop_duplicates(["unitid", "key"])
+        if not num.empty:
+            frames.append(num.pivot(index="unitid", columns="key", values="val"))
+
+    # Boolean flags: keep only literal Yes/No (drop everything else as parse noise).
+    bool_map = {fid: key for fid, key in config.COLLEGEDATA_EXTRA_BOOL_FIELDS}
+    bl = g[g["field_id"].isin(bool_map)].copy() if "value_text" in g.columns else g.iloc[0:0].copy()
+    if not bl.empty:
+        bl["key"] = bl["field_id"].map(bool_map)
+        bl["val"] = bl["value_text"].astype(str).str.strip().str.capitalize()
+        bl = bl[bl["val"].isin(("Yes", "No"))]
+        bl = bl.sort_values("_yr", ascending=False).drop_duplicates(["unitid", "key"])
+        if not bl.empty:
+            frames.append(bl.pivot(index="unitid", columns="key", values="val"))
+
+    if not frames:
+        return None
+    wide = pd.concat(frames, axis=1).reset_index()
+    # Guarantee every expected column exists even if a field had zero surviving rows, so the
+    # merge and per-column coverage log below never KeyError.
+    all_keys = ([k for _f, k in config.COLLEGEDATA_EXTRA_NUM_FIELDS]
+                + [k for _f, k in config.COLLEGEDATA_EXTRA_BOOL_FIELDS])
+    for k in all_keys:
+        if k not in wide.columns:
+            wide[k] = pd.NA
+    return wide
+
+
+def stage2f_extra(df, skip, force):
+    log("=== Stage 2f: CollegeData.FYI merit aid & admission-policy fields ===")
+    keys = ([k for _f, k in config.COLLEGEDATA_EXTRA_NUM_FIELDS]
+            + [k for _f, k in config.COLLEGEDATA_EXTRA_BOOL_FIELDS])
+    try:
+        extra = parse_collegedata_extra(fetch_collegedata_extra(skip, force))
+    except Exception as e:  # noqa: BLE001 - optional source must never fail the build
+        log(f"  WARNING: extra-fields parse failed ({e}); continuing without them")
+        extra = None
+    if extra is None:
+        for k in keys:
+            df[k] = pd.NA
+        log(f"  extra fields unavailable; columns N/A for all {len(df):,} schools")
+        return df
+    df = df.merge(extra, on="unitid", how="left")
+    for k in keys:
+        cov = int(df[k].notna().sum())
+        log(f"    {k:<20} coverage: {cov:,}/{len(df):,}")
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Stage 3: Opportunity Insights mobility
 # ---------------------------------------------------------------------------
 
@@ -1017,6 +1163,7 @@ def main():
     df = stage2c_app_fee(df, paths["ic"])
     df, gpa_span = stage2d_gpa(df, args.skip_download, args.force_download)
     df, c7_span, c7_dropped = stage2e_c7(df, args.skip_download, args.force_download)
+    df = stage2f_extra(df, args.skip_download, args.force_download)
     df = stage3_oi(df, paths["oi1"], paths["oi11"])
     df, clery_years = stage4_clery(df, paths["clery"])
 

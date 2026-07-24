@@ -233,13 +233,15 @@
       { key: "sat_avg" },
       { range: ["act_25", "act_75"], label: "ACT composite (25th–75th)" },
       { key: "gpa" },
-      { key: "test_policy" }, { key: "essay" }, { key: "yield" }] },
+      { key: "test_policy" }, { key: "essay" }, { key: "yield" },
+      { key: "ed_offered" }, { key: "ea_offered" }, { key: "waitlist_admitted" }] },
     { group: "Admission factors", id: "c7", collapsible: true,
       items: DATA.fields.filter(function (f) { return f.key.indexOf("c7_") === 0; })
                         .map(function (f) { return { key: f.key }; }) },
     { group: "Cost", items: [
       { key: "tuition_in" }, { key: "tuition_out" }, { key: "cost_attend" },
       { key: "net_price" }, { key: "grant_aid" },
+      { key: "merit_recipients" }, { key: "merit_award_avg" },
       { key: "np_0_30" }, { key: "np_30_48" }, { key: "np_48_75" },
       { key: "np_75_110" }, { key: "np_110p" }, { key: "pct_pell" }, { key: "pct_loan" },
       { key: "debt_median" }, { key: "loan_payment" }] },

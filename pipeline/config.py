@@ -122,6 +122,21 @@ C7_NOTE = (
     "with parsed CDS filings are covered; others show N/A."
 )
 
+# Other collegedata.fyi CDS fields beyond GPA/C7 (merit aid + admission-policy detail). These
+# just map a CDS field_id to its output column; all display metadata (label, type, group, note)
+# lives in FIELDS below, the single source of truth for rendering. Fetched together in stage 2f.
+# NUM fields take value_num; BOOL fields take value_text (kept only if literally "Yes"/"No").
+COLLEGEDATA_EXTRA_NUM_FIELDS = [
+    ("H.2A01", "merit_recipients"),
+    ("H.2A02", "merit_award_avg"),
+    ("C.204",  "waitlist_admitted"),
+]
+# Yes/No CDS admission-policy flags -> "Yes"/"No" string columns (anything else dropped as noise).
+COLLEGEDATA_EXTRA_BOOL_FIELDS = [
+    ("C.2101", "ed_offered"),
+    ("C.2201", "ea_offered"),
+]
+
 # ---------------------------------------------------------------------------
 # Scorecard columns to read (of ~3,300) and row filter
 # ---------------------------------------------------------------------------
@@ -298,6 +313,12 @@ FIELDS = [
     {"key": "test_policy","label": "Test scores",       "group": "adm",  "type": "str",  "better": "neutral", "source": "scorecard"},
     {"key": "essay",     "label": "Application essay",   "group": "adm",  "type": "str",  "better": "neutral", "source": "ipeds_adm"},
     {"key": "yield",     "label": "Yield (enrolled / admitted)", "group": "adm", "type": "frac", "better": "higher", "source": "ipeds_adm"},
+    {"key": "ed_offered", "label": "Early Decision offered", "group": "adm", "type": "str", "better": "neutral", "source": "collegedata",
+     "note": "Whether the school offers an Early Decision plan (a binding early application), from its Common Data Set, section C21 (via collegedata.fyi). Only the few hundred schools with published CDS filings are covered; others show N/A."},
+    {"key": "ea_offered", "label": "Early Action offered", "group": "adm", "type": "str", "better": "neutral", "source": "collegedata",
+     "note": "Whether the school offers an Early Action plan (a non-binding early application), from its Common Data Set, section C22 (via collegedata.fyi). Only the few hundred schools with published CDS filings are covered; others show N/A."},
+    {"key": "waitlist_admitted", "label": "Admitted from wait list", "group": "adm", "type": "int", "better": "neutral", "source": "collegedata",
+     "note": "Number of applicants admitted from the wait list, from each school's Common Data Set, section C2 (via collegedata.fyi). A raw count, so larger schools tend to report larger numbers; a value near zero can mean few or none were admitted from the wait list that cycle. Only the few hundred schools with published CDS filings are covered; others show N/A."},
     # -- CDS C7 admission-factor importance (generated from COLLEGEDATA_C7_FIELDS)
     *[{"key": k, "label": lbl, "group": "adm", "type": "str",
        "better": "neutral", "source": "collegedata", "note": C7_NOTE}
@@ -309,6 +330,10 @@ FIELDS = [
     {"key": "net_price", "label": "Avg net price",         "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "grant_aid", "label": "Avg grant aid",         "group": "cost", "type": "usd", "better": "higher", "source": "ipeds_sfa",
      "note": "Average grant & scholarship aid awarded to full-time first-time undergraduates"},
+    {"key": "merit_recipients", "label": "Merit scholarship recipients", "group": "cost", "type": "int", "better": "neutral", "source": "collegedata",
+     "note": "Number of first-time, full-time first-years awarded institutional non-need-based (merit) scholarships or grants, from each school's Common Data Set, section H2A (via collegedata.fyi). A raw count, so larger schools tend to report larger numbers. Distinct from \"Avg grant aid\" above, which is need-based. Only the few hundred schools with published CDS filings are covered; others show N/A."},
+    {"key": "merit_award_avg", "label": "Avg merit scholarship", "group": "cost", "type": "usd", "better": "higher", "source": "collegedata",
+     "note": "Average dollar value of institutional non-need-based (merit) scholarships or grants awarded to first-time, full-time first-years, from each school's Common Data Set, section H2A (via collegedata.fyi). Only the few hundred schools with published CDS filings are covered; others show N/A."},
     {"key": "np_0_30",   "label": "Net price: $0-30k income",   "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "np_30_48",  "label": "Net price: $30-48k income",  "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},
     {"key": "np_48_75",  "label": "Net price: $48-75k income",  "group": "cost", "type": "usd", "better": "lower", "source": "scorecard"},

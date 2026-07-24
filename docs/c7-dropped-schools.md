@@ -21,7 +21,7 @@ real section C7 and read the ratings yourself.
 > overwritten on the next run.
 
 <!-- BEGIN GENERATED: c7-dropped -->
-_Generated from the 2026-07-23 build (2024-25–2025-26 cycles) — do not edit this region by hand; `pipeline/build_data.py` overwrites it on every run._
+_Generated from the 2026-07-24 build (2024-25–2025-26 cycles) — do not edit this region by hand; `pipeline/build_data.py` overwrites it on every run._
 
 ## Dropped schools (52)
 
