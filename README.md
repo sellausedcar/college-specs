@@ -159,6 +159,86 @@ site/       index.html, styles.css, app.js, data.js (generated, committed)
 pipeline/   build_data.py (stages 0–5), config.py (URLs/fields), requirements.txt
 ```
 
+## Alternatives and prior art
+
+*Surveyed 2026-07 — roughly 20 repository queries plus topic searches. Dated because "nothing
+like this exists" is only ever true as of a moment.*
+
+**Nothing on GitHub replaces this project.** Everything found sorts into four groups, none of
+them a substitute:
+
+| Group | Examples | Why it isn't a replacement |
+|---|---|---|
+| Data layers, no UI | [`paulgp/ipeds-database`](https://github.com/paulgp/ipeds-database) (41★), [`btskinner/downloadipeds`](https://github.com/btskinner/downloadipeds) (15★), [`adamrossnelson/StataIPEDSAll`](https://github.com/adamrossnelson/StataIPEDSAll) (14★), [`scipeds`](https://github.com/scienceforamerica/scipeds) (12★), [`bolewood/collegedata-fyi`](https://github.com/bolewood/collegedata-fyi) (6★) | Deliver raw data to R/Stata/DuckDB/Python. Upstream of this project, not competing with it — the merge, comparison logic and site are still yours to write |
+| One-off analyses | `College-Scorecard-Data-Analysis`, `college-scorecard-roi-storytelling`, `An-Exploration-of-Value-Added-Methodology` | Notebooks answering a question once; not tools anyone else can run |
+| Student comparison apps (0–4★) | `college-comparison-tool`, `college-compare`, `collegehub`, `EduSeek`, `CollageHunt`, `college_walla` | Small, mostly stale, several India-focused; no data pipeline behind them |
+| Official tools | [`RTICWDT/college-scorecard`](https://github.com/RTICWDT/college-scorecard) (319★), [`cfpb/django-college-costs-comparison`](https://github.com/cfpb/django-college-costs-comparison) (10★) | The first is the real College Scorecard site; the second compares *financial-aid award letters*, a different job |
+
+The clearest evidence is negative — these searches returned **zero repositories**:
+`opportunity insights mobility report cards`, `clery campus safety crime data`,
+`college scorecard IPEDS merge`. Nobody is combining these federal sources into a comparison
+product, so the merge (and the pipeline that maintains it) is more of the value here than the
+UI is.
+
+### The real substitution risk isn't open source
+
+If someone drops this tool it won't be for a repo, it'll be for a hosted site.
+**collegescorecard.ed.gov** is free, official, covers ~6,400 schools and already does
+side-by-side comparison — for a visitor who only wants cost, earnings and completion, it is
+better resourced than this project. **UniIQ**, **Degreechoices**, **CollegeSimply** and
+**Niche** hold the consumer-search niche (UniIQ claims 215 schools against our ~1,944).
+
+None of them carry this merge: admission-factor ratings, average HS GPA, economic mobility and
+campus safety in one dense spec table doesn't exist elsewhere, free or paid, open or closed.
+
+**Where the case is weakest, honestly.** The differentiator is the merge, not the interface —
+and two of its distinctive pieces are thin. CDS-derived GPA and C7 reach only ~13% of schools,
+and Opportunity Insights is frozen at a 2017–18 release built on 1980–91 birth cohorts. The
+parts that are dense and current (Scorecard, IPEDS) are precisely the parts the official site
+also has. That's where a "why use this instead" argument has to be made.
+
+### Investigated and rejected: the aggregator's `/api/compare` endpoint
+
+The one case where a nominal competitor sits inside our own data source. collegedata.fyi exposes
+`GET /api/compare?schools=a,b,c`, which looks like it overlaps this project directly. It doesn't,
+on two counts: the response (`generated_at`, `schools`, `columns`, `rows`) carries **no C7
+admission-factor data at all**, so it can't serve the rows that prompted the look; and it requires
+a live server on every page view, which is the opposite of this site's no-backend, `file://`-safe
+design. Recorded so it doesn't get re-investigated.
+
+### No reusable CDS extractor exists
+
+The same survey turned up a useful negative result: **there is no maintained, licensed, reusable
+Common Data Set extractor on GitHub.** The only one that exists,
+[`kandluis/commonDataSetExtractor`](https://github.com/kandluis/commonDataSetExtractor), was last
+committed in January 2019 and carries **no license** — all rights reserved, so its code can be
+read but not reused. [`tommaho/CDSx`](https://github.com/tommaho/CDSx) is explicitly abandoned by
+its author. Nothing else parses CDS documents at all.
+
+That independently supports two choices this pipeline already made: **depending on an aggregator
+rather than parsing CDS PDFs ourselves** (the hard part is the extraction, and nobody has a
+reusable answer to it), and **detecting garbled output rather than trusting any parser's
+provenance** — the parse-failure guards exist precisely because CDS extraction is unsolved, not
+because this particular aggregator is unusually weak.
+
+Also worth knowing: **IPEDS packages don't cover our fields.**
+[`scipeds`](https://github.com/scienceforamerica/scipeds) is scoped to *completions* — no
+admissions, aid, enrollment, or tuition — so it can't serve the ADM/SFA/IC pulls in stages 2–2c.
+
+### Reference: the IPEDS column dictionary
+
+[`paulgp/ipeds-database`](https://github.com/paulgp/ipeds-database) (MIT, active) publishes
+[`DICTIONARY.md`](https://github.com/paulgp/ipeds-database/blob/master/DICTIONARY.md) — ~4,700
+lines cataloguing every column of every IPEDS table with its **null rate** and a sample value
+(e.g. `applfeeu` 21.6% null, `admcon11` 80.7%). Handy for answering "does this variable exist
+this year, and how sparse is it?" without downloading a ~20 MB survey zip first.
+
+**Not a substitute for the runtime probes.** It's a column catalogue, not a cross-year rename
+crosswalk, and it describes someone else's snapshot. The stage 2/2c probes (see the `APPLFEEU`
+note in `config.py`) check the file actually downloaded, so they can't go stale — swapping them
+for a static third-party table would trade robustness away. Use the dictionary to *look things
+up*, not to decide what the pipeline reads.
+
 ## Future improvements
 
 ### Build-time ID-mapping for essay-prompt links
@@ -229,44 +309,3 @@ A cheap way to track this: re-run stage 2e against a fresh fetch and diff the dr
 against [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md), which the build regenerates
 anyway. A shrinking set means upstream re-extraction is working; a growing one means a new
 failure shape to look at.
-
-### Investigated and rejected: the aggregator's `/api/compare` endpoint
-
-collegedata.fyi exposes `GET /api/compare?schools=a,b,c`, which looks like it overlaps this
-project directly. It doesn't, on two counts: the response (`generated_at`, `schools`, `columns`,
-`rows`) carries **no C7 admission-factor data at all**, so it can't serve the rows that prompted
-the look; and it requires a live server on every page view, which is the opposite of this site's
-no-backend, `file://`-safe design. Recorded here so it doesn't get re-investigated.
-
-### Prior art (surveyed 2026-07): no reusable CDS extractor exists
-
-A survey of comparable open-source projects turned up a useful negative result: **there is no
-maintained, licensed, reusable Common Data Set extractor on GitHub.** The only one that exists,
-[`kandluis/commonDataSetExtractor`](https://github.com/kandluis/commonDataSetExtractor), was last
-committed in January 2019 and carries **no license** — all rights reserved, so its code can be
-read but not reused. [`tommaho/CDSx`](https://github.com/tommaho/CDSx) is explicitly abandoned by
-its author. Nothing else parses CDS documents at all.
-
-That independently supports two choices this pipeline already made: **depending on an aggregator
-rather than parsing CDS PDFs ourselves** (the hard part is the extraction, and nobody has a
-reusable answer to it), and **detecting garbled output rather than trusting any parser's
-provenance** — the parse-failure guards exist precisely because CDS extraction is unsolved, not
-because this particular aggregator is unusually weak.
-
-Also worth knowing: **IPEDS packages don't cover our fields.**
-[`scipeds`](https://github.com/scienceforamerica/scipeds) is scoped to *completions* — no
-admissions, aid, enrollment, or tuition — so it can't serve the ADM/SFA/IC pulls in stages 2–2c.
-
-### Reference: the IPEDS column dictionary
-
-[`paulgp/ipeds-database`](https://github.com/paulgp/ipeds-database) (MIT, active) publishes
-[`DICTIONARY.md`](https://github.com/paulgp/ipeds-database/blob/master/DICTIONARY.md) — ~4,700
-lines cataloguing every column of every IPEDS table with its **null rate** and a sample value
-(e.g. `applfeeu` 21.6% null, `admcon11` 80.7%). Handy for answering "does this variable exist
-this year, and how sparse is it?" without downloading a ~20 MB survey zip first.
-
-**Not a substitute for the runtime probes.** It's a column catalogue, not a cross-year rename
-crosswalk, and it describes someone else's snapshot. The stage 2/2c probes (see the `APPLFEEU`
-note in `config.py`) check the file actually downloaded, so they can't go stale — swapping them
-for a static third-party table would trade robustness away. Use the dictionary to *look things
-up*, not to decide what the pipeline reads.
