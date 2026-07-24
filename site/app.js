@@ -11,8 +11,13 @@
   var FIELD = {};
   DATA.fields.forEach(function (f) { FIELD[f.key] = f; });
   var SCHOOLS = DATA.schools;
+  // unitid -> archived CDS URL, for schools whose admission factors are N/A because the
+  // build dropped a garbled C7 parse. Absent for schools the aggregator never covered, so
+  // an unexplained N/A stays unexplained rather than getting a misleading link.
+  var C7_DROPPED = DATA.c7_dropped || {};
 
   function get(row, key) { return row[IDX[key]]; }
+  function c7DroppedUrl(row) { return C7_DROPPED[String(get(row, "unitid"))] || null; }
   var byId = new Map();
   SCHOOLS.forEach(function (r) { byId.set(get(r, "unitid"), r); });
 
@@ -297,13 +302,26 @@
     });
     html += "</tr></thead><tbody>";
 
-    var clusterNotes = [];
+    var footNotes = [];
     rows.forEach(function (r) {
       if (get(r, "oi_cluster") === 1) {
-        clusterNotes.push("<p>* " + esc(get(r, "name")) + ": mobility values are estimated for the “" +
+        footNotes.push("<p>* " + esc(get(r, "name")) + ": mobility values are estimated for the “" +
           esc(titleCase(get(r, "oi_cluster_name") || "multi-campus")) + "” group of campuses.</p>");
       }
     });
+    // Only while the Admission factors group is expanded — otherwise the note would point at
+    // a † the reader cannot see (that group is collapsed by default).
+    if (!collapsedGroups.c7) {
+      rows.forEach(function (r) {
+        var cds = c7DroppedUrl(r);
+        if (cds) {
+          footNotes.push("<p>† " + esc(get(r, "name")) + ": this school publishes a Common Data " +
+            "Set, but its section C7 table was misread when parsed, so we show N/A instead of " +
+            "wrong ratings — <a href=\"" + esc(cds) + "\" target=\"_blank\" rel=\"noopener\">" +
+            "read the filing ↗</a>.</p>");
+        }
+      });
+    }
 
     ROWS.forEach(function (grp) {
       var open = !grp.collapsible || !collapsedGroups[grp.id];
@@ -360,9 +378,13 @@
           var disp = itemDisplay(item, r);
           var isBest = winner !== null && v !== null && Math.abs(v - winner) < 1e-9;
           var star = meta.group === "mob" && get(r, "oi_cluster") === 1 && disp !== null ? "*" : "";
+          // A C7 N/A on a dropped school isn't "no data" — it's data we withheld because the
+          // source parse was garbled. Mark it and explain once in the footnotes below.
+          var dropMark = meta.group === "adm" && item.key && item.key.indexOf("c7_") === 0 &&
+                         disp === null && c7DroppedUrl(r) ? "†" : "";
           html += "<td" + (isBest ? " class=\"best\"" : "") + ">";
           if (disp === null) {
-            html += "<span class=\"cell-val cell-na\">N/A</span>";
+            html += "<span class=\"cell-val cell-na\">N/A" + dropMark + "</span>";
           } else {
             html += "<span class=\"cell-val\">" + esc(disp) + star + "</span>";
             if (barMax !== null && typeof v === "number") {
@@ -378,8 +400,8 @@
     html += "</tbody>";
     el.table.innerHTML = html;
 
-    if (clusterNotes.length) {
-      el.notes.innerHTML = clusterNotes.join("");
+    if (footNotes.length) {
+      el.notes.innerHTML = footNotes.join("");
       el.notes.hidden = false;
     }
     renderChips();

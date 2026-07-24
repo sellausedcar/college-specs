@@ -115,7 +115,14 @@ statistics for privacy.
     refreshes. The field-id sets driving the guards live in `config.py`
     (`C7_CONTEXTUAL_FIELDS`, `C7_ANCHOR_FIELDS`). The specific schools dropped — several
     well-known (Northwestern, Caltech, Michigan), whose CDS *parse* failed rather than being
-    absent — are listed in [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md).
+    absent — are listed in [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md), each
+    linked to the archived filing the bad parse came from.
+  - **Dropped ≠ never covered, in the UI.** A dropped school's N/A carries a **†** on every
+    factor row, and a footnote under the table explains the misparse and links to that
+    school's archived CDS so you can read section C7 yourself. Schools the aggregator simply
+    never covered show a plain N/A with no marker and no link — the distinction the site
+    couldn't previously make, since both are just nulls in `data.js`. Stage 5 emits the
+    dropped set as a `c7_dropped` map (unitid → archived-filing URL) for exactly this.
 - Essay *prompts* aren't a bundled dataset (they're copyrighted and rewritten yearly, and no
   site supports opening one school's prompts by name). The Application-essay row links to the
   My Supplementals and CollegeVine prompt databases; clicking a link **copies that school's name**
@@ -202,27 +209,13 @@ databases — they can't be deep-linked to a specific school by name (and U.S. N
 rankings behind sign-in). Decide the final set/placement when implementing (you mentioned "three
 links" but listed four sites).
 
-### "Find the Common Data Set" search link for schools dropped by the C7 guards
+### ~~"Find the Common Data Set" link for schools dropped by the C7 guards~~ — done
 
-For a school whose *Admission factors* show **N/A because its C7 record was dropped by the
-[parse-failure guards](#caveats)** — i.e. it **is** in collegedata.fyi and its real CDS exists,
-but the parse was garbled (see [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md)) — add a
-small **"find the Common Data Set"** link next to the N/A that runs a Google search for that
-school's CDS, so the reader can open the actual filing and read section C7 themselves. It turns a
-dead-end N/A into a one-click path to the source, for schools whose CDS is *known* to exist.
-
-**Scope: dropped schools only.** A school that does **not** appear in collegedata.fyi at all gets
-**no link** — its N/A stays as-is. This is deliberately a targeted "our source mangled this
-school's CDS, here's how to find the real one" affordance, not a generic search on every N/A.
-
-Like the essay **"see prompts"** and proposed **"see rankings"** links, it embeds **no data** —
-just a search URL built at render time from the school name, e.g.
-`https://www.google.com/search?q=%22University+of+Michigan%22+%22Common+Data+Set%22`.
-Copyright-safe, no per-school ID map, no API key.
-
-**Implementation note.** The site can't currently distinguish a *dropped* N/A from a
-*never-covered* one — both are just `null` in `data.js`. So this needs the pipeline to expose the
-dropped-school set to the front-end (it's already computed in stage 2e and written to
-`docs/c7-dropped-schools.md`; e.g. emit those UNITIDs into `data.js` so `app.js` can show the link
-only for them). Optionally append the latest cycle (e.g. `2024-25`) to the query to bias toward
-the current CDS.
+Shipped, and better than the sketch above it replaced. The plan was a Google search built from
+the school name, because the site had no way to tell a *dropped* N/A from a *never-covered* one.
+It turned out the aggregator's own `cds_fields` table carries `archive_url` — a direct link to
+the archived filing — keyed by the `ipeds_id` we already join on, in the query stage 2e already
+issues. So no search URL, no ID map, no extra request: stage 5 emits a `c7_dropped` map and the
+compare view marks those N/As with a **†** plus a footnote linking the real filing. Still embeds
+no ratings data, and never-covered schools still get nothing. See the *Admission factors*
+caveat above.

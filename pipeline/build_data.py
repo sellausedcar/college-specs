@@ -755,12 +755,12 @@ def stage2e_c7(df, skip, force):
         for k in keys:
             df[k] = pd.NA
         log(f"  C7 unavailable; columns N/A for all {len(df):,} schools")
-        return df, None
+        return df, None, []
     df = df.merge(c7, on="unitid", how="left")
     covered = df[keys].notna().any(axis=1).sum()
     log(f"  C7 coverage: {covered:,}/{len(df):,} schools with >=1 factor (CDS cycles {span})")
     write_c7_dropped_doc(df, dropped, span)
-    return df, span
+    return df, span, dropped
 
 
 # ---------------------------------------------------------------------------
@@ -916,7 +916,7 @@ def cast_value(v, ftype):
     return str(v)
 
 
-def stage5_emit(df, vintages):
+def stage5_emit(df, vintages, c7_dropped=()):
     log("=== Stage 5: emit + validate ===")
     failures = []
 
@@ -965,11 +965,22 @@ def stage5_emit(df, vintages):
     for rec in records:
         schools.append([cast_value(rec[k], types[k]) for k in config.FIELD_KEYS])
 
+    # Schools whose admission factors are N/A *because* stage 2e dropped a garbled C7 parse,
+    # mapped to the archived filing it came from. Lets the site tell that apart from a school
+    # the aggregator simply never covered -- both are plain nulls in `schools`. Restricted to
+    # schools actually in the output, and to entries that carry a URL to link to.
+    in_output = set(df["unitid"].astype(int))
+    c7_dropped_map = {str(d["unitid"]): d["archive_url"]
+                      for d in (c7_dropped or ())
+                      if d.get("archive_url") and d["unitid"] in in_output}
+    log(f"  C7 dropped-with-source links: {len(c7_dropped_map):,}")
+
     payload = {
         "generated": datetime.date.today().isoformat(),
         "vintages": vintages,
         "fields": fields,
         "schools": schools,
+        "c7_dropped": c7_dropped_map,
     }
     out = SITE / "data.js"
     text = "window.COLLEGE_DATA=" + json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + ";"
@@ -1004,7 +1015,7 @@ def main():
     df = stage2b_grant_aid(df, paths["sfa"])
     df = stage2c_app_fee(df, paths["ic"])
     df, gpa_span = stage2d_gpa(df, args.skip_download, args.force_download)
-    df, c7_span = stage2e_c7(df, args.skip_download, args.force_download)
+    df, c7_span, c7_dropped = stage2e_c7(df, args.skip_download, args.force_download)
     df = stage3_oi(df, paths["oi1"], paths["oi11"])
     df, clery_years = stage4_clery(df, paths["clery"])
 
@@ -1021,7 +1032,7 @@ def main():
         "oi": f"Opportunity Insights, {config.OI_VINTAGE}",
         "clery": f"Campus Safety and Security, {clery_span}",
     }
-    stage5_emit(df, vintages)
+    stage5_emit(df, vintages, c7_dropped)
     log("DONE")
 
 
