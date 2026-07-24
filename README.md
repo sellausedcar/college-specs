@@ -237,3 +237,36 @@ project directly. It doesn't, on two counts: the response (`generated_at`, `scho
 `rows`) carries **no C7 admission-factor data at all**, so it can't serve the rows that prompted
 the look; and it requires a live server on every page view, which is the opposite of this site's
 no-backend, `file://`-safe design. Recorded here so it doesn't get re-investigated.
+
+### Prior art (surveyed 2026-07): no reusable CDS extractor exists
+
+A survey of comparable open-source projects turned up a useful negative result: **there is no
+maintained, licensed, reusable Common Data Set extractor on GitHub.** The only one that exists,
+[`kandluis/commonDataSetExtractor`](https://github.com/kandluis/commonDataSetExtractor), was last
+committed in January 2019 and carries **no license** — all rights reserved, so its code can be
+read but not reused. [`tommaho/CDSx`](https://github.com/tommaho/CDSx) is explicitly abandoned by
+its author. Nothing else parses CDS documents at all.
+
+That independently supports two choices this pipeline already made: **depending on an aggregator
+rather than parsing CDS PDFs ourselves** (the hard part is the extraction, and nobody has a
+reusable answer to it), and **detecting garbled output rather than trusting any parser's
+provenance** — the parse-failure guards exist precisely because CDS extraction is unsolved, not
+because this particular aggregator is unusually weak.
+
+Also worth knowing: **IPEDS packages don't cover our fields.**
+[`scipeds`](https://github.com/scienceforamerica/scipeds) is scoped to *completions* — no
+admissions, aid, enrollment, or tuition — so it can't serve the ADM/SFA/IC pulls in stages 2–2c.
+
+### Reference: the IPEDS column dictionary
+
+[`paulgp/ipeds-database`](https://github.com/paulgp/ipeds-database) (MIT, active) publishes
+[`DICTIONARY.md`](https://github.com/paulgp/ipeds-database/blob/master/DICTIONARY.md) — ~4,700
+lines cataloguing every column of every IPEDS table with its **null rate** and a sample value
+(e.g. `applfeeu` 21.6% null, `admcon11` 80.7%). Handy for answering "does this variable exist
+this year, and how sparse is it?" without downloading a ~20 MB survey zip first.
+
+**Not a substitute for the runtime probes.** It's a column catalogue, not a cross-year rename
+crosswalk, and it describes someone else's snapshot. The stage 2/2c probes (see the `APPLFEEU`
+note in `config.py`) check the file actually downloaded, so they can't go stale — swapping them
+for a static third-party table would trade robustness away. Use the dictionary to *look things
+up*, not to decide what the pipeline reads.
