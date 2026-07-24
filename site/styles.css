@@ -219,19 +219,22 @@ td.best .cell-val::before { content: "✓ "; color: var(--best-ink); font-weight
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-.essay-note {
+/* Collapsible info panel. Shared by the compare-view essay note and the footer's
+   "how this compares" note -- .ca-prompts below is the only essay-specific part. */
+.essay-note, .about-note {
   margin-top: 14px; border: 1px solid var(--grid); border-radius: 12px;
   background: var(--surface); padding: 0 16px;
 }
-.essay-note > summary {
+.essay-note > summary, .about-note > summary {
   cursor: pointer; padding: 12px 0; font-weight: 650; font-size: 14px; list-style-position: inside;
 }
-.essay-note > summary:hover { color: var(--accent); }
-.essay-note[open] > summary { border-bottom: 1px solid var(--grid); margin-bottom: 4px; }
-.essay-note p { color: var(--ink-2); font-size: 13.5px; margin: 10px 0; }
+.essay-note > summary:hover, .about-note > summary:hover { color: var(--accent); }
+.essay-note[open] > summary,
+.about-note[open] > summary { border-bottom: 1px solid var(--grid); margin-bottom: 4px; }
+.essay-note p, .about-note p { color: var(--ink-2); font-size: 13.5px; margin: 10px 0; }
 .essay-note .ca-prompts { margin: 10px 0; padding-left: 22px; color: var(--ink); }
 .essay-note .ca-prompts li { font-size: 13.5px; margin: 7px 0; line-height: 1.5; }
-.essay-note p.muted { color: var(--muted); font-size: 12.5px; }
+.essay-note p.muted, .about-note p.muted { color: var(--muted); font-size: 12.5px; }
 
 .notes { margin-top: 12px; color: var(--muted); font-size: 13px; }
 .notes p { margin: 4px 0; }
