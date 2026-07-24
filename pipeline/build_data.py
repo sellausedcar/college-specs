@@ -502,12 +502,13 @@ def stage2d_gpa(df, skip, force):
 
 C7_MAX_PAGES = 40  # 40k rows, >5x current volume; growth past this means revisit the design
 
-# Columns pulled from the aggregator's cds_fields table. `school_id` (the aggregator's slug)
-# and `archive_url` (the archived CDS filing for that school-cycle) are not used by the merge
-# -- they are carried so a dropped school can be linked straight to its source document
-# instead of a bare N/A. Verified populated for every C7 row of every currently-dropped
-# school; see docs/c7-dropped-schools.md.
-C7_SELECT = ("ipeds_id,school_id,school_name,field_id,canonical_year,year_start,value_text,"
+# Columns pulled from the aggregator's cds_fields table. `archive_url` is the only one the
+# merge itself doesn't use: it points at the archived filing for that school-cycle, so a school
+# dropped by the guards below can link to the document the bad parse came from instead of
+# showing a bare N/A. Populated for every C7 row; see docs/c7-dropped-schools.md.
+# (The sibling `school_id` slug is deliberately not selected: it would only build a link to the
+# school's landing page, and archive_url already resolves to the exact cycle we dropped.)
+C7_SELECT = ("ipeds_id,school_name,field_id,canonical_year,year_start,value_text,"
              "value_status,sub_institutional,data_quality_flag,archive_url")
 
 
