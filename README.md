@@ -209,13 +209,31 @@ databases — they can't be deep-linked to a specific school by name (and U.S. N
 rankings behind sign-in). Decide the final set/placement when implementing (you mentioned "three
 links" but listed four sites).
 
-### ~~"Find the Common Data Set" link for schools dropped by the C7 guards~~ — done
+### Re-check the C7 dropped set after aggregator refreshes
 
-Shipped, and better than the sketch above it replaced. The plan was a Google search built from
-the school name, because the site had no way to tell a *dropped* N/A from a *never-covered* one.
-It turned out the aggregator's own `cds_fields` table carries `archive_url` — a direct link to
-the archived filing — keyed by the `ipeds_id` we already join on, in the query stage 2e already
-issues. So no search URL, no ID map, no extra request: stage 5 emits a `c7_dropped` map and the
-compare view marks those N/As with a **†** plus a footnote linking the real filing. Still embeds
-no ratings data, and never-covered schools still get nothing. See the *Admission factors*
-caveat above.
+The [parse-failure guards](#caveats) currently drop 52 in-scope schools. Those records aren't
+randomly bad — they concentrate almost entirely in the aggregator's lowest-tier PDF parser.
+Across all `C.701` rows the producer split is roughly **310 `tier4_docling`/`pdf_flat`, 94
+`tier2_acroform`/`pdf_fillable`, 28 `tier1_xlsx`, 6 other**; among the dropped schools it is
+**52 of 55 rows `tier4_docling`/`pdf_flat`**. The two deterministic tiers (fillable-PDF AcroForm fields
+and the official XLSX template) essentially never produce a garbled record.
+
+So these schools recover only if the aggregator re-extracts them at a higher tier — nothing on
+our side changes the outcome. Worth re-running the comparison after refreshes, because the
+signal is mixed: their C7 layer *is* actively maintained (rows updated the same day it was last
+checked, 2026-07-23), yet the dropped schools' own rows were last touched in May–June 2026, and
+a re-check that day recovered **0 of 52**. Better source material exists for at least some of
+them — Michigan alone has 7 archived source documents.
+
+A cheap way to track this: re-run stage 2e against a fresh fetch and diff the dropped set
+against [`docs/c7-dropped-schools.md`](docs/c7-dropped-schools.md), which the build regenerates
+anyway. A shrinking set means upstream re-extraction is working; a growing one means a new
+failure shape to look at.
+
+### Investigated and rejected: the aggregator's `/api/compare` endpoint
+
+collegedata.fyi exposes `GET /api/compare?schools=a,b,c`, which looks like it overlaps this
+project directly. It doesn't, on two counts: the response (`generated_at`, `schools`, `columns`,
+`rows`) carries **no C7 admission-factor data at all**, so it can't serve the rows that prompted
+the look; and it requires a live server on every page view, which is the opposite of this site's
+no-backend, `file://`-safe design. Recorded here so it doesn't get re-investigated.
